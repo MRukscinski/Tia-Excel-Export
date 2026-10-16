@@ -56,7 +56,7 @@
             // textBox1
             // 
             this.textBox1.Location = new System.Drawing.Point(4, 24);
-            this.textBox1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.textBox1.Margin = new System.Windows.Forms.Padding(2);
             this.textBox1.Name = "textBox1";
             this.textBox1.Size = new System.Drawing.Size(286, 20);
             this.textBox1.TabIndex = 0;
@@ -64,7 +64,7 @@
             // searchBtn
             // 
             this.searchBtn.Location = new System.Drawing.Point(4, 45);
-            this.searchBtn.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.searchBtn.Margin = new System.Windows.Forms.Padding(2);
             this.searchBtn.Name = "searchBtn";
             this.searchBtn.Size = new System.Drawing.Size(75, 26);
             this.searchBtn.TabIndex = 1;
@@ -75,7 +75,7 @@
             // button1
             // 
             this.button1.Location = new System.Drawing.Point(84, 45);
-            this.button1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button1.Margin = new System.Windows.Forms.Padding(2);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(62, 26);
             this.button1.TabIndex = 3;
@@ -86,7 +86,7 @@
             // btnLoadCsv
             // 
             this.btnLoadCsv.Location = new System.Drawing.Point(4, 45);
-            this.btnLoadCsv.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnLoadCsv.Margin = new System.Windows.Forms.Padding(2);
             this.btnLoadCsv.Name = "btnLoadCsv";
             this.btnLoadCsv.Size = new System.Drawing.Size(75, 26);
             this.btnLoadCsv.TabIndex = 4;
@@ -97,7 +97,7 @@
             // textBox2
             // 
             this.textBox2.Location = new System.Drawing.Point(4, 24);
-            this.textBox2.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.textBox2.Margin = new System.Windows.Forms.Padding(2);
             this.textBox2.Name = "textBox2";
             this.textBox2.Size = new System.Drawing.Size(286, 20);
             this.textBox2.TabIndex = 5;
@@ -109,9 +109,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.treeViewDB.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.treeViewDB.Location = new System.Drawing.Point(9, 200);
-            this.treeViewDB.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.treeViewDB.Margin = new System.Windows.Forms.Padding(2);
             this.treeViewDB.Name = "treeViewDB";
-            this.treeViewDB.Size = new System.Drawing.Size(596, 393);
+            this.treeViewDB.Size = new System.Drawing.Size(650, 548);
             this.treeViewDB.TabIndex = 7;
             this.treeViewDB.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.treeViewDB_AfterCheck);
             // 
@@ -128,8 +128,8 @@
             // button2
             // 
             this.button2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.button2.Location = new System.Drawing.Point(9, 597);
-            this.button2.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button2.Location = new System.Drawing.Point(9, 752);
+            this.button2.Margin = new System.Windows.Forms.Padding(2);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(80, 27);
             this.button2.TabIndex = 10;
@@ -140,8 +140,8 @@
             // button3
             // 
             this.button3.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.button3.Location = new System.Drawing.Point(332, 597);
-            this.button3.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button3.Location = new System.Drawing.Point(386, 752);
+            this.button3.Margin = new System.Windows.Forms.Padding(2);
             this.button3.Name = "button3";
             this.button3.Size = new System.Drawing.Size(139, 27);
             this.button3.TabIndex = 11;
@@ -152,8 +152,8 @@
             // button4
             // 
             this.button4.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.button4.Location = new System.Drawing.Point(475, 597);
-            this.button4.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button4.Location = new System.Drawing.Point(529, 752);
+            this.button4.Margin = new System.Windows.Forms.Padding(2);
             this.button4.Name = "button4";
             this.button4.Size = new System.Drawing.Size(130, 27);
             this.button4.TabIndex = 12;
@@ -167,9 +167,9 @@
             this.groupBox1.Controls.Add(this.searchBtn);
             this.groupBox1.Controls.Add(this.button1);
             this.groupBox1.Location = new System.Drawing.Point(9, 10);
-            this.groupBox1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.groupBox1.Margin = new System.Windows.Forms.Padding(2);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.groupBox1.Padding = new System.Windows.Forms.Padding(2);
             this.groupBox1.Size = new System.Drawing.Size(294, 81);
             this.groupBox1.TabIndex = 13;
             this.groupBox1.TabStop = false;
@@ -180,9 +180,9 @@
             this.groupBox2.Controls.Add(this.textBox2);
             this.groupBox2.Controls.Add(this.btnLoadCsv);
             this.groupBox2.Location = new System.Drawing.Point(9, 96);
-            this.groupBox2.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.groupBox2.Margin = new System.Windows.Forms.Padding(2);
             this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.groupBox2.Padding = new System.Windows.Forms.Padding(2);
             this.groupBox2.Size = new System.Drawing.Size(294, 81);
             this.groupBox2.TabIndex = 14;
             this.groupBox2.TabStop = false;
@@ -203,7 +203,7 @@
             // button5
             // 
             this.button5.Location = new System.Drawing.Point(375, 141);
-            this.button5.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button5.Margin = new System.Windows.Forms.Padding(2);
             this.button5.Name = "button5";
             this.button5.Size = new System.Drawing.Size(122, 37);
             this.button5.TabIndex = 16;
@@ -216,10 +216,10 @@
             this.linkLabel1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.linkLabel1.AutoSize = true;
             this.linkLabel1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.6F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.linkLabel1.Location = new System.Drawing.Point(563, 16);
+            this.linkLabel1.Location = new System.Drawing.Point(617, 16);
             this.linkLabel1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.linkLabel1.Name = "linkLabel1";
-            this.linkLabel1.Size = new System.Drawing.Size(45, 15);
+            this.linkLabel1.Size = new System.Drawing.Size(63, 22);
             this.linkLabel1.TabIndex = 17;
             this.linkLabel1.TabStop = true;
             this.linkLabel1.Text = "pomoc";
@@ -227,9 +227,9 @@
             // splitter1
             // 
             this.splitter1.Location = new System.Drawing.Point(0, 0);
-            this.splitter1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.splitter1.Margin = new System.Windows.Forms.Padding(2);
             this.splitter1.Name = "splitter1";
-            this.splitter1.Size = new System.Drawing.Size(2, 634);
+            this.splitter1.Size = new System.Drawing.Size(2, 789);
             this.splitter1.TabIndex = 18;
             this.splitter1.TabStop = false;
             // 
@@ -237,9 +237,9 @@
             // 
             this.checkBox1.AutoSize = true;
             this.checkBox1.Location = new System.Drawing.Point(516, 132);
-            this.checkBox1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.checkBox1.Margin = new System.Windows.Forms.Padding(2);
             this.checkBox1.Name = "checkBox1";
-            this.checkBox1.Size = new System.Drawing.Size(80, 17);
+            this.checkBox1.Size = new System.Drawing.Size(87, 21);
             this.checkBox1.TabIndex = 19;
             this.checkBox1.Text = "checkBox1";
             this.checkBox1.UseVisualStyleBackColor = true;
@@ -248,7 +248,7 @@
             // 
             this.pictureBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.pictureBox1.Image = global::Test_Opennes_Clanker.Properties.Resources.Primetals_Technologies_11;
-            this.pictureBox1.Location = new System.Drawing.Point(352, 55);
+            this.pictureBox1.Location = new System.Drawing.Point(406, 55);
             this.pictureBox1.Margin = new System.Windows.Forms.Padding(2);
             this.pictureBox1.Name = "pictureBox1";
             this.pictureBox1.Size = new System.Drawing.Size(244, 63);
@@ -262,7 +262,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.Control;
-            this.ClientSize = new System.Drawing.Size(614, 634);
+            this.ClientSize = new System.Drawing.Size(668, 789);
             this.Controls.Add(this.checkBox1);
             this.Controls.Add(this.splitter1);
             this.Controls.Add(this.linkLabel1);
@@ -275,7 +275,7 @@
             this.Controls.Add(this.label3);
             this.Controls.Add(this.treeViewDB);
             this.Controls.Add(this.pictureBox1);
-            this.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.Margin = new System.Windows.Forms.Padding(2);
             this.MinimumSize = new System.Drawing.Size(394, 332);
             this.Name = "frontForm";
             this.Text = "Primexcel2000";

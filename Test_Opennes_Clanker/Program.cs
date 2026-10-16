@@ -21,7 +21,7 @@ namespace TiaDbToExcelExporter
     internal class Program
     {
 
-
+        //kocham konskie kutasy
         private const string TargetDbName = "Parameters_DB";
         private const int MaxLevelColumns = 8; // Liczba kolumn na poziomy zagnieżdżenia (A-H)
 

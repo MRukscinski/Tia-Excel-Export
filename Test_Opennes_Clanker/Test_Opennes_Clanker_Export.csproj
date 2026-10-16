@@ -102,6 +102,7 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ExcelExporterService.cs" />
     <Compile Include="frontForm.cs">
       <SubType>Form</SubType>
     </Compile>

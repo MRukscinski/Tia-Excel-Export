@@ -113,7 +113,7 @@
             this.treeViewDB.Location = new System.Drawing.Point(9, 200);
             this.treeViewDB.Margin = new System.Windows.Forms.Padding(2);
             this.treeViewDB.Name = "treeViewDB";
-            this.treeViewDB.Size = new System.Drawing.Size(596, 393);
+            this.treeViewDB.Size = new System.Drawing.Size(650, 548);
             this.treeViewDB.TabIndex = 7;
             this.treeViewDB.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.treeViewDB_AfterCheck);
             // 
@@ -218,10 +218,10 @@
             this.linkLabel1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.linkLabel1.AutoSize = true;
             this.linkLabel1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.6F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.linkLabel1.Location = new System.Drawing.Point(563, 16);
+            this.linkLabel1.Location = new System.Drawing.Point(617, 16);
             this.linkLabel1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.linkLabel1.Name = "linkLabel1";
-            this.linkLabel1.Size = new System.Drawing.Size(45, 15);
+            this.linkLabel1.Size = new System.Drawing.Size(63, 22);
             this.linkLabel1.TabIndex = 17;
             this.linkLabel1.TabStop = true;
             this.linkLabel1.Text = "pomoc";
@@ -231,7 +231,7 @@
             this.splitter1.Location = new System.Drawing.Point(0, 0);
             this.splitter1.Margin = new System.Windows.Forms.Padding(2);
             this.splitter1.Name = "splitter1";
-            this.splitter1.Size = new System.Drawing.Size(2, 634);
+            this.splitter1.Size = new System.Drawing.Size(2, 789);
             this.splitter1.TabIndex = 18;
             this.splitter1.TabStop = false;
             // 
@@ -241,7 +241,7 @@
             this.checkBox1.Location = new System.Drawing.Point(516, 132);
             this.checkBox1.Margin = new System.Windows.Forms.Padding(2);
             this.checkBox1.Name = "checkBox1";
-            this.checkBox1.Size = new System.Drawing.Size(80, 17);
+            this.checkBox1.Size = new System.Drawing.Size(87, 21);
             this.checkBox1.TabIndex = 19;
             this.checkBox1.Text = "checkBox1";
             this.checkBox1.UseVisualStyleBackColor = true;
@@ -257,7 +257,6 @@
             this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.pictureBox1.TabIndex = 15;
             this.pictureBox1.TabStop = false;
-            this.pictureBox1.Click += new System.EventHandler(this.pictureBox1_Click);
             // 
             // pictureBox2
             // 
@@ -275,7 +274,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.Control;
-            this.ClientSize = new System.Drawing.Size(614, 634);
+            this.ClientSize = new System.Drawing.Size(668, 789);
             this.Controls.Add(this.checkBox1);
             this.Controls.Add(this.splitter1);
             this.Controls.Add(this.linkLabel1);

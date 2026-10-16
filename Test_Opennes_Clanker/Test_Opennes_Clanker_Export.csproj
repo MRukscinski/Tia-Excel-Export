@@ -121,6 +121,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="TiaPortalService.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

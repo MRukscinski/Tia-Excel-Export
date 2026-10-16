@@ -34,7 +34,7 @@ namespace TiaDbToExcelExporter
             // Tutaj podajesz nazwę swojego formularza:
             Application.Run(new frontForm());
        
-        //sigma 67
+        
         }
 
     }//Sigma

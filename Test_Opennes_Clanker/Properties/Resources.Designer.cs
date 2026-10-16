@@ -63,9 +63,29 @@ namespace Test_Opennes_Clanker.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap _0cb96cf5_dfd1_42a8_91a1_7efefdacd3fb {
+            get {
+                object obj = ResourceManager.GetObject("0cb96cf5-dfd1-42a8-91a1-7efefdacd3fb", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Primetals_Technologies_11 {
             get {
                 object obj = ResourceManager.GetObject("Primetals_Technologies-11", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Primetals_Technologieskolo {
+            get {
+                object obj = ResourceManager.GetObject("Primetals_Technologieskolo", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

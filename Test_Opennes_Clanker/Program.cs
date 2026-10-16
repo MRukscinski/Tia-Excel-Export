@@ -36,9 +36,10 @@ namespace TiaDbToExcelExporter
        
         
         }
-        //komenarz test 
-    }
+
+    }//Sigma
 }
+
 /*
 using System;
 using System.Collections.Generic;

@@ -37,8 +37,9 @@ namespace TiaDbToExcelExporter
         
         }
 
-    }
+    }//Sigma
 }
+
 /*
 using System;
 using System.Collections.Generic;

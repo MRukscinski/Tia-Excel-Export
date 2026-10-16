@@ -141,5 +141,11 @@
   <ItemGroup>
     <None Include="Resources\Primetals_Technologies-11.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Primetals_Technologieskolo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\0cb96cf5-dfd1-42a8-91a1-7efefdacd3fb.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

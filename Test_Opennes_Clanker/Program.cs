@@ -32,7 +32,7 @@ namespace TiaDbToExcelExporter
         
         }
 
-    }
+    }//Sigma
 }
 
 /*

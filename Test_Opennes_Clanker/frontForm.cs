@@ -95,29 +95,73 @@ namespace Test_Opennes_Clanker
                 }
             }
         }
-        private void button1_Click(object sender, EventArgs e)
+        private async void button1_Click(object sender, EventArgs e)
         {
-            // 1. Pobieramy ścieżkę z TextBoxa
-            string projectPath = textBox1.Text.Trim();
+            // 1. Zabezpieczenie interfejsu (start animacji ładowania)
+            
+            button1.Enabled = false;
 
-            // 2. Walidacja: sprawdzenie, czy użytkownik w ogóle podał ścieżkę
-            if (string.IsNullOrWhiteSpace(projectPath))
+            try
             {
-                MessageBox.Show("Najpierw wybierz lub wpisz ścieżkę do projektu TIA Portal!",
-                                "Brak ścieżki", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                TiaPortal runningTiaProcess = null;
+                Project activeProject = null;
+
+                // 2. Praca w tle (Task.Run), aby nie zamrozić interfejsu WinForms
+                await Task.Run(() =>
+                {
+                    // Pobieramy listę wszystkich uruchomionych procesów TIA Portal na komputerze
+                    var runningProcesses = TiaPortal.GetProcesses();
+
+                    if (runningProcesses.Count == 0)
+                    {
+                        throw new Exception("Nie znaleziono żadnej uruchomionej instancji TIA Portal!");
+                    }
+
+                    // Podłączamy się pod pierwszy wykryty proces TIA Portal
+                    runningTiaProcess = runningProcesses[0].Attach();
+                    activeProject = runningTiaProcess.Projects.FirstOrDefault();
+
+                    if (activeProject == null)
+                    {
+                        throw new Exception("W wykrytej instancji TIA Portal nie ma otwartego żadnego projektu.");
+                    }
+                });
+
+                // 3. Automatycznie wpisujemy pełną ścieżkę projektu do textBox1 (w wątku UI)
+                string detectedProjectPath = activeProject.Path.FullName;
+                textBox1.Text = detectedProjectPath;
+
+                MessageBox.Show($"Pomyślnie podłączono do otwartego projektu TIA Portal:\n{activeProject.Name}\n\nŚcieżka: {detectedProjectPath}",
+                                "Sukces TIA Openness", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ToggleLoadingAnimation();
+
+                // 4. (Opcjonalnie) Możesz od razu wygenerować strukturę CSV z podłączonego projektu
+                this.NazwaCsvDir = "lista_ster_bloki_DB.csv";
+
+                await Task.Run(() =>
+                {
+                    TiaPortalService.ExportTiaStructureToCsv(detectedProjectPath, NazwaCsvDir);
+                });
+
+                // Automatyczne załadowanie wygenerowanego CSV do drzewka
+                string fullCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
+                if (File.Exists(fullCsvPath))
+                {
+                    LoadDataBlocksToTree(fullCsvPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Błąd podczas wykrywania TIA Portal:\n{ex.Message}",
+                                "Błąd Openness", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // Wyłączenie animacji i odblokowanie przycisku
+                ToggleLoadingAnimation();
+                button1.Enabled = true;
             }
 
-            // 3. Walidacja: sprawdzenie, czy plik projektu faktycznie istnieje na dysku
-            if (!File.Exists(projectPath))
-            {
-                MessageBox.Show($"Wskazany plik projektu nie istnieje:\n{projectPath}",
-                                "Błąd ścieżki", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            // 4. Wywołanie Twojej przykładowej funkcji z przekazaniem ścieżki <<<<<<<<<<<<<<<<<<<<TUTAJ FUNKCJA MICHAŁA>>>>>>>>>>>>>>>>>>>>
-            //MojaPrzykładowaFunkcja(projectPath); 
         }
         private void btnLoadCsv_Click(object sender, EventArgs e) //TYMCZASOWE
         {
@@ -602,7 +646,7 @@ namespace Test_Opennes_Clanker
                     ExcelImporterService.ImportSelectedDbsFromExcel(project, excelFilePath, targetsToImport);
                 });
 
-                MessageBox.Show("Import wybranych bloków z Excela zakończony sukcesem!", "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
             }
             catch (Exception ex)
             {
@@ -625,6 +669,7 @@ namespace Test_Opennes_Clanker
 
                 // Zatrzymanie animacji i odblokowanie przycisku UI
                 ToggleLoadingAnimation();
+                MessageBox.Show("Import wybranych bloków z Excela zakończony sukcesem!", "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 button2.Enabled = true;
             }
         }

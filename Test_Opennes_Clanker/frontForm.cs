@@ -542,10 +542,5 @@ namespace Test_Opennes_Clanker
                 pictureBox1.Invalidate(); // Pierwsze wymuszenie rysowania
             }
         }
-
-        private void pictureBox2_Click(object sender, EventArgs e)
-        {
-
-        }
     }   
 }

@@ -211,7 +211,7 @@
             this.button5.TabIndex = 16;
             this.button5.Text = "button5";
             this.button5.UseVisualStyleBackColor = true;
-            this.button5.Click += new System.EventHandler(this.btnOpenEditor_Click);
+            this.button5.Click += new System.EventHandler(this.btnImportSelected_Click);
             // 
             // linkLabel1
             // 

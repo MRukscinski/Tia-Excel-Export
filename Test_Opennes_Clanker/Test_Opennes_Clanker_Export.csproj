@@ -103,6 +103,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ExcelExporterService.cs" />
+    <Compile Include="ExcelImportService.cs" />
     <Compile Include="frontForm.cs">
       <SubType>Form</SubType>
     </Compile>

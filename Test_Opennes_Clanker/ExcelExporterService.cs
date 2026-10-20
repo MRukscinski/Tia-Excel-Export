@@ -18,11 +18,57 @@ namespace Primexcel
     {
         private const int MaxLevelColumns = 8; // Liczba kolumn na poziomy zagnieżdżenia (A-H)
 
+        /// <summary>
+        /// Buduje listę celów (PlcName, DbPath) na podstawie wskazanych indeksów wierszy z pliku CSV.
+        /// </summary>
+        public static List<(string PlcName, string DbPath)> BuildTargetsFromCsv(string csvFullPath, int[] selectedIndices)
+        {
+            var targets = new List<(string PlcName, string DbPath)>();
+
+            if (selectedIndices == null || selectedIndices.Length == 0 || !File.Exists(csvFullPath))
+            {
+                return targets;
+            }
+
+            string[] lines = File.ReadAllLines(csvFullPath);
+
+            foreach (int csvRowIndex in selectedIndices)
+            {
+                if (csvRowIndex < 0 || csvRowIndex >= lines.Length) continue;
+
+                string line = lines[csvRowIndex];
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                string[] columns = line.Split(';');
+                if (columns.Length > 6)
+                {
+                    string targetPlcName = columns[3].Trim('"').Trim();
+                    string fullPathRaw = columns[6].Trim('"').Trim();
+
+                    string projName = columns[2].Trim('"').Trim();
+                    string prefix = $"{projName}/{targetPlcName}/";
+
+                    string targetDbPath = fullPathRaw;
+                    if (fullPathRaw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetDbPath = fullPathRaw.Substring(prefix.Length);
+                    }
+
+                    targets.Add((targetPlcName, targetDbPath));
+                }
+            }
+
+            return targets;
+        }
+
+        /// <summary>
+        /// Główna metoda eksportująca wybrane bloki DB do pliku Excel.
+        /// </summary>
         public static void ExportSelectedDbsToExcel(Project project, string excelFilePath, List<(string PlcName, string DbPath)> targets)
         {
             if (targets == null || targets.Count == 0) return;
 
-            // 1. Kopia zapasowa TYLKO wtedy, gdy plik już wcześniej istniał na dysku
+            // 1. Kopia zapasowa, jeśli plik już istniał na dysku
             if (File.Exists(excelFilePath))
             {
                 try
@@ -42,20 +88,15 @@ namespace Primexcel
                 }
             }
 
-            // 2. Jeśli plik istnieje – wczytujemy go; jeśli nie istnieje – tworzymy pusty obiekt XLWorkbook
+            // 2. Wczytanie lub utworzenie nowego skoroszytu
             XLWorkbook workbook = File.Exists(excelFilePath) ? new XLWorkbook(excelFilePath) : new XLWorkbook();
 
             using (workbook)
             {
-                // =========================================================================
-                // CZYSZCZENIE Z ZACHOWANIEM LEGENDY
-                // =========================================================================
+                // Czyszczenie z zachowaniem Legendy
                 var tempResetSheet = workbook.Worksheets.Add("Temp_Reset_Sheet");
-
-                // Upewniamy się, że arkusz Legendy istnieje
                 EnsureLegendSheetExists(workbook);
 
-                // Usuwamy stare arkusze DB (zostawiamy Temp_Reset_Sheet oraz Legendę)
                 var existingSheets = workbook.Worksheets
                     .Where(ws => ws.Name != "Temp_Reset_Sheet" &&
                                  !string.Equals(ws.Name, "Legend", StringComparison.OrdinalIgnoreCase))
@@ -65,9 +106,8 @@ namespace Primexcel
                 {
                     sheet.Delete();
                 }
-                // =========================================================================
 
-                // Buforowanie sterowników PLC z TIA Portal w pamięci RAM
+                // Buforowanie sterowników w pamięci RAM
                 var plcMap = new Dictionary<string, PlcSoftware>(StringComparer.OrdinalIgnoreCase);
                 foreach (Device device in project.Devices)
                 {
@@ -82,7 +122,6 @@ namespace Primexcel
 
                 bool processedAny = false;
 
-                // 3. Generating new worksheets only for selected DB blocks
                 foreach (var target in targets)
                 {
                     if (!plcMap.TryGetValue(target.PlcName, out PlcSoftware plcSoftware))
@@ -104,7 +143,6 @@ namespace Primexcel
                     }
                 }
 
-                // 4. Usunięcie arkusza tymczasowego i zapis skompilowanego pliku
                 if (processedAny && workbook.Worksheets.Count > 1)
                 {
                     tempResetSheet.Delete();
@@ -114,7 +152,6 @@ namespace Primexcel
                         workbook.Worksheet("Legend").Position = 1;
                     }
 
-                    // Zapis do wybranej ścieżki
                     workbook.SaveAs(excelFilePath);
                     Console.WriteLine($"\nSUCCESS: Saved Excel file at: {excelFilePath}");
                 }

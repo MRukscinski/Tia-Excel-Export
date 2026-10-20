@@ -58,7 +58,7 @@ namespace Primexcel
                 // Usuwamy stare arkusze DB (zostawiamy Temp_Reset_Sheet oraz Legendę)
                 var existingSheets = workbook.Worksheets
                     .Where(ws => ws.Name != "Temp_Reset_Sheet" &&
-                                 !string.Equals(ws.Name, "Legenda", StringComparison.OrdinalIgnoreCase))
+                                 !string.Equals(ws.Name, "Legend", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
                 foreach (var sheet in existingSheets)
@@ -82,19 +82,19 @@ namespace Primexcel
 
                 bool processedAny = false;
 
-                // 3. Generowanie nowych arkuszy tylko dla zaznaczonych bloków DB
+                // 3. Generating new worksheets only for selected DB blocks
                 foreach (var target in targets)
                 {
                     if (!plcMap.TryGetValue(target.PlcName, out PlcSoftware plcSoftware))
                     {
-                        Console.WriteLine($"[OSTRZEŻENIE] Nie znaleziono sterownika '{target.PlcName}'. Pomijanie.");
+                        Console.WriteLine($"[WARNING] Controller '{target.PlcName}' not found. Skipping.");
                         continue;
                     }
 
                     PlcBlock dbBlock = FindBlockByPath(plcSoftware, target.DbPath);
                     if (dbBlock == null)
                     {
-                        Console.WriteLine($"[OSTRZEŻENIE] Nie znaleziono bloku pod ścieżką '{target.DbPath}'. Pomijanie.");
+                        Console.WriteLine($"[WARNING] Block not found under path '{target.DbPath}'. Skipping.");
                         continue;
                     }
 
@@ -131,19 +131,19 @@ namespace Primexcel
         private static bool ProcessSingleDbToSheet(PlcBlock dbBlock, PlcSoftware plcSoftware, XLWorkbook workbook, string plcName)
         {
             string dbName = dbBlock.Name;
-            Console.WriteLine($" -> Przetwarzanie bloku '{dbName}' ({plcName})...");
+            Console.WriteLine($" -> Processing block '{dbName}' ({plcName})...");
 
-            // Sprawdzanie spójności / kompilacja
+            // Consistency check / compilation
             if (!dbBlock.IsConsistent)
             {
-                Console.WriteLine($" -> Blok '{dbName}' jest niespójny. Próba kompilacji PLC...");
+                Console.WriteLine($" -> Block '{dbName}' is inconsistent. Attempting PLC compilation...");
                 ICompilable compilable = plcSoftware.GetService<ICompilable>();
                 if (compilable != null)
                 {
                     var result = compilable.Compile();
                     if (result.ErrorCount > 0)
                     {
-                        Console.WriteLine($" -> [BŁĄD] Kompilacja nie powiodła się ({result.ErrorCount} błędów). Pomijanie.");
+                        Console.WriteLine($" -> [ERROR] Compilation failed ({result.ErrorCount} errors). Skipping.");
                         return false;
                     }
                 }
@@ -156,16 +156,16 @@ namespace Primexcel
             string tempXmlPath = Path.Combine(Path.GetTempPath(), $"{plcName}_{dbName}.xml");
             try
             {
-                // Eksport DB do XML
+                // DB export to XML
                 dbBlock.Export(new FileInfo(tempXmlPath), ExportOptions.WithDefaults);
 
-                // Parsowanie XML
+                // XML parsing
                 List<DbParameterRow> parameters = ParseDbXml(tempXmlPath);
 
                 string rawSheetName = $"{plcName}_{dbName}";
                 string safeSheetName = SanitizeSheetName(rawSheetName);
 
-                // Jeśli arkusz istniał, zastępujemy go
+                // Replace worksheet if it already exists
                 if (workbook.Worksheets.Contains(safeSheetName))
                 {
                     workbook.Worksheets.Worksheet(safeSheetName).Delete();
@@ -174,37 +174,36 @@ namespace Primexcel
                 IXLWorksheet worksheet = workbook.Worksheets.Add(safeSheetName);
 
                 // =========================================================================
-                // 1. NAGŁÓWKI POZIOMÓW DRZEWA (Kolumny A - H)
+                // 1. TREE LEVEL HEADERS (Columns A - H)
                 // =========================================================================
                 for (int level = 1; level <= MaxLevelColumns; level++)
                 {
                     int levelFromRight = MaxLevelColumns - level + 1;
                     worksheet.Cell(1, level).Value = levelFromRight == 1
-                        ? "Nazwa Zmiennej"
-                        : $"Poziom -{levelFromRight}";
+                        ? "Variable Name"
+                        : $"Level -{levelFromRight}";
                 }
 
                 // =========================================================================
-                // 2. NAGŁÓWKI WŁAŚCIWOŚCI (Kolumny I, J, K, L)
+                // 2. PROPERTY HEADERS (Columns I, J, K, L)
                 // =========================================================================
-                worksheet.Cell(1, MaxLevelColumns + 1).Value = "Typ Danych";
-                worksheet.Cell(1, MaxLevelColumns + 2).Value = "Wartość ze Sterownika";
-                worksheet.Cell(1, MaxLevelColumns + 3).Value = "Wartość do Wpisania"; // <- Nowa kolumna
-                worksheet.Cell(1, MaxLevelColumns + 4).Value = "Komentarz";
+                worksheet.Cell(1, MaxLevelColumns + 1).Value = "Data Type";
+                worksheet.Cell(1, MaxLevelColumns + 2).Value = "Value from Controller";
+                worksheet.Cell(1, MaxLevelColumns + 3).Value = "Value to Input"; // <- New editable column
+                worksheet.Cell(1, MaxLevelColumns + 4).Value = "Comment";
 
-                // Formatowanie nagłówka (zmieniła się całkowita szerokość: MaxLevelColumns + 4)
+                // Header formatting (total width: MaxLevelColumns + 4)
                 int totalColumns = MaxLevelColumns + 4;
                 var headerRange = worksheet.Range(1, 1, 1, totalColumns);
                 headerRange.Style.Font.Bold = true;
                 headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
                 headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                // Wyróżnienie kolumny "Wartość do Wpisania" innym kolorem (np. jasnoniebieskim),
-                // aby użytkownik wiedział, gdzie ma wpisywać nowe dane
+                // Highlight "Value to Input" column with light blue color for user clarity
                 worksheet.Cell(1, MaxLevelColumns + 3).Style.Fill.BackgroundColor = XLColor.FromHtml("#D9E1F2");
 
                 // =========================================================================
-                // 3. WYPEŁNIANIE DANYCH
+                // 3. POPULATING DATA
                 // =========================================================================
                 int currentRow = 2;
                 foreach (var param in parameters)
@@ -218,22 +217,22 @@ namespace Primexcel
 
                     int startColumn = MaxLevelColumns - path.Count + 1;
 
-                    // Zapis drzewka ścieżki
+                    // Write tree structure path
                     for (int i = 0; i < path.Count; i++)
                     {
                         worksheet.Cell(currentRow, startColumn + i).Value = path[i];
                     }
 
-                    // Typ Danych
+                    // Data Type
                     worksheet.Cell(currentRow, MaxLevelColumns + 1).Value = param.DataType;
 
-                    // Wartość ze Sterownika (aktualny stan w DB)
+                    // Value from Controller (current DB value)
                     worksheet.Cell(currentRow, MaxLevelColumns + 2).Value = param.StartValue;
 
-                    // Wartość do Wpisania (zostawiamy puste dla użytkownika)
+                    // Value to Input (left empty for user input)
                     worksheet.Cell(currentRow, MaxLevelColumns + 3).Value = string.Empty;
 
-                    // Komentarz
+                    // Comment
                     worksheet.Cell(currentRow, MaxLevelColumns + 4).Value = param.Comment;
 
                     currentRow++;
@@ -246,12 +245,12 @@ namespace Primexcel
                     worksheet.RangeUsed().SetAutoFilter();
                 }
 
-                Console.WriteLine($" -> Pomyślnie dodano/zaktualizowano arkusz '{safeSheetName}'.");
+                Console.WriteLine($" -> Successfully added/updated worksheet '{safeSheetName}'.");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($" -> [BŁĄD] Podczas przetwarzania DB w {plcName}: {ex.Message}");
+                Console.WriteLine($" -> [ERROR] While processing DB in {plcName}: {ex.Message}");
                 return false;
             }
             finally
@@ -408,35 +407,35 @@ namespace Primexcel
         /// </summary>
         private static void EnsureLegendSheetExists(XLWorkbook workbook)
         {
-            string legendSheetName = "Legenda";
+            string legendSheetName = "Legend";
 
             if (workbook.Worksheets.Contains(legendSheetName))
             {
-                return; // Legenda już istnieje, nic nie robimy
+                return;
             }
 
             IXLWorksheet legendWs = workbook.Worksheets.Add(legendSheetName);
 
-            // Tytuł Legendy
-            legendWs.Cell(1, 1).Value = "LEGENDA I OPIS KOLUMN";
+            // Title
+            legendWs.Cell(1, 1).Value = "LEGEND AND COLUMN DESCRIPTION";
             legendWs.Cell(1, 1).Style.Font.Bold = true;
             legendWs.Cell(1, 1).Style.Font.FontSize = 14;
 
-            // Nagłówki tabeli opisowej
-            legendWs.Cell(3, 1).Value = "Nazwa Kolumny";
-            legendWs.Cell(3, 2).Value = "Opis / Przeznaczenie";
+            // Headers
+            legendWs.Cell(3, 1).Value = "Column Name";
+            legendWs.Cell(3, 2).Value = "Description / Purpose";
 
             var headerRange = legendWs.Range(3, 1, 3, 2);
             headerRange.Style.Font.Bold = true;
             headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
 
-            // Opisy poszczególnych kolumn z arkuszy DB
+            // Descriptions
             int row = 4;
-            AddLegendRow(legendWs, ref row, "Poziom -X / Nazwa Zmiennej", "Drzewiasta struktura zmiennej w bloku DB.");
-            AddLegendRow(legendWs, ref row, "Typ Danych", "Typ danych w PLC (np. BOOL, INT, REAL, STRING).");
-            AddLegendRow(legendWs, ref row, "Wartość ze Sterownika", "Wartość odczytana z projektu TIA Portal / bloku DB.");
-            AddLegendRow(legendWs, ref row, "Wartość do Wpisania", "Pole edytowalne (wyróżnione kolorem) przeznaczone do wprowadzenia nowych wartości.");
-            AddLegendRow(legendWs, ref row, "Komentarz", "Komentarz przypisany do zmiennej w TIA Portal.");
+            AddLegendRow(legendWs, ref row, "Level -X / Variable Name", "Tree structure path of the member in the Data Block.");
+            AddLegendRow(legendWs, ref row, "Data Type", "PLC data type (e.g., BOOL, INT, REAL, STRING).");
+            AddLegendRow(legendWs, ref row, "Value from Controller", "Current value read from TIA Portal Data Block.");
+            AddLegendRow(legendWs, ref row, "Value to Input", "Editable field (highlighted in light blue) for entering new values to import.");
+            AddLegendRow(legendWs, ref row, "Comment", "Tag comment defined in TIA Portal.");
 
             legendWs.Columns().AdjustToContents();
         }

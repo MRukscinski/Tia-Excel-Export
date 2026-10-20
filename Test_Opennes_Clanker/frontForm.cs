@@ -46,49 +46,61 @@ namespace Primexcel
             pictureBox1.Paint += PictureBox1_Paint;
         }
 
-        private async void btnBrowse(object sender, EventArgs e) //Szukanie sciezki
+        private async void btnBrowse(object sender, EventArgs e)
         {
+            string selectedPath = string.Empty;
+
+            // 1. Dajemy użytkownikowi wybór: plik projektu (.ap* / .als*) lub folder multiprojektu
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
-                openFileDialog.Title = "Wybierz projekt TIA Portal";
-                openFileDialog.Filter = "Projekty TIA Portal (*.ap*)|*.ap*|Wszystkie pliki (*.*)|*.*";
+                openFileDialog.Title = "Select TIA Portal project or multi-project";
+                openFileDialog.Filter = "All TIA Projects (*.ap*;*.als*)|*.ap*;*.als*|" +
+                                        "Single Projects (*.ap*)|*.ap*|" +
+                                        "Multi-Projects (*.als*)|*.als*|" +
+                                        "All files (*.*)|*.*";
                 openFileDialog.FilterIndex = 1;
                 openFileDialog.RestoreDirectory = true;
 
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    // 1. Przypisanie wybranej ścieżki z pliku do TextBoxa i zmiennej
-                    string projectPath = openFileDialog.FileName;
-                    textBox1.Text = projectPath;
-
-                    // 2. Nazwa pliku CSV z listą zagnieżdżeń
-                    NazwaCsvDir = "lista_ster_bloki_DB.csv";
-
-                    ToggleLoadingAnimation();
-                    try
-                    {
-                        // . Uruchamiamy ciężki eksport na osobnym wątku (UI pozostaje wolny i animacja działa!)
-                        await Task.Run(() =>
-                        {
-                            TiaPortalService.ExportTiaStructureToCsv(projectPath, NazwaCsvDir);
-                        });
-
-                        // 5. Ładowanie do drzewka wykonywane w wątku UI po zakończeniu eksportu
-                        string fullCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
-                        LoadDataBlocksToTree(fullCsvPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Błąd podczas przetwarzania projektu:\n{ex.Message}",
-                                        "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                    finally
-                    {
-                        // 6. Wyłączamy animację ZAWSZE po zakończeniu (nawet jeśli wystąpił błąd)
-                        ToggleLoadingAnimation();
-                    }
-
+                    selectedPath = openFileDialog.FileName;
                 }
+                else
+                {
+                    return; // Użytkownik anulował wybór
+                }
+            }
+
+            textBox1.Text = selectedPath;
+            NazwaCsvDir = "lista_ster_bloki_DB.csv";
+
+            ToggleLoadingAnimation();
+            searchBtn.Enabled = false;
+
+            try
+            {
+                // 2. Eksport struktury w tle bez zamrażania interfejsu
+                await Task.Run(() =>
+                {
+                    TiaPortalService.ExportTiaStructureToCsv(selectedPath, NazwaCsvDir);
+                });
+
+                // 3. Wczytanie wygenerowanego CSV do drzewka
+                string fullCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
+                if (File.Exists(fullCsvPath))
+                {
+                    LoadDataBlocksToTree(fullCsvPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during TIA Portal detection:\n{ex.Message}",
+                        "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                ToggleLoadingAnimation();
+                searchBtn.Enabled = true;
             }
         }
         private async void button1_Click(object sender, EventArgs e)
@@ -110,7 +122,7 @@ namespace Primexcel
 
                     if (runningProcesses.Count == 0)
                     {
-                        throw new Exception("Nie znaleziono żadnej uruchomionej instancji TIA Portal!");
+                        throw new Exception("No active TIA Portal instance found!");
                     }
 
                     // Podłączamy się pod pierwszy wykryty proces TIA Portal
@@ -119,7 +131,7 @@ namespace Primexcel
 
                     if (activeProject == null)
                     {
-                        throw new Exception("W wykrytej instancji TIA Portal nie ma otwartego żadnego projektu.");
+                        throw new Exception("No open project found in the detected TIA Portal instance.");
                     }
                 });
 
@@ -127,12 +139,13 @@ namespace Primexcel
                 string detectedProjectPath = activeProject.Path.FullName;
                 textBox1.Text = detectedProjectPath;
 
-                MessageBox.Show($"Pomyślnie podłączono do otwartego projektu TIA Portal:\n{activeProject.Name}\n\nŚcieżka: {detectedProjectPath}",
-                                "Sukces TIA Openness", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Successfully connected to active TIA Portal project:\n{activeProject.Name}\n\nPath: {detectedProjectPath}",
+                 "TIA Openness Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                NazwaCsvDir = "lista_ster_bloki_DB.csv";
                 ToggleLoadingAnimation();
 
                 // 4. (Opcjonalnie) Możesz od razu wygenerować strukturę CSV z podłączonego projektu
-                this.NazwaCsvDir = "lista_ster_bloki_DB.csv";
+                //this.NazwaCsvDir = "lista_ster_bloki_DB.csv";
 
                 await Task.Run(() =>
                 {
@@ -148,8 +161,8 @@ namespace Primexcel
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Błąd podczas wykrywania TIA Portal:\n{ex.Message}",
-                                "Błąd Openness", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error during TIA Portal detection:\n{ex.Message}",
+                        "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -376,7 +389,7 @@ namespace Primexcel
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Błąd podczas budowania drzewa:\n{ex.Message}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error while building tree structure:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -507,11 +520,7 @@ namespace Primexcel
         }
 
 
-        //_______________________________FUNKCJE Z PROGRAMU MICHAŁA__________________
-        //--------------------------------------------------------------------------
-       
-
-        #region Assembly Resolver
+        #region Assembly Resolver //CZY TO MA JESZCZE SENS? 0 - REFERENCJI
         private static Assembly MyResolver(object sender, ResolveEventArgs args)
         {
             int index = args.Name.IndexOf(',');

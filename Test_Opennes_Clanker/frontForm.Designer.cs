@@ -132,7 +132,7 @@
             // button2
             // 
             this.button2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.button2.Location = new System.Drawing.Point(7, 752);
+            this.button2.Location = new System.Drawing.Point(468, 752);
             this.button2.Margin = new System.Windows.Forms.Padding(2);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(119, 27);
@@ -144,10 +144,10 @@
             // button4
             // 
             this.button4.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.button4.Location = new System.Drawing.Point(457, 752);
+            this.button4.Location = new System.Drawing.Point(114, 751);
             this.button4.Margin = new System.Windows.Forms.Padding(2);
             this.button4.Name = "button4";
-            this.button4.Size = new System.Drawing.Size(130, 27);
+            this.button4.Size = new System.Drawing.Size(87, 27);
             this.button4.TabIndex = 12;
             this.button4.Text = "Uncheck All";
             this.button4.UseVisualStyleBackColor = true;
@@ -260,12 +260,12 @@
             // button3
             // 
             this.button3.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.button3.Location = new System.Drawing.Point(314, 752);
+            this.button3.Location = new System.Drawing.Point(9, 751);
             this.button3.Margin = new System.Windows.Forms.Padding(2);
             this.button3.Name = "button3";
-            this.button3.Size = new System.Drawing.Size(139, 27);
+            this.button3.Size = new System.Drawing.Size(101, 27);
             this.button3.TabIndex = 11;
-            this.button3.Text = "Select All";
+            this.button3.Text = "Check All";
             this.button3.UseVisualStyleBackColor = true;
             this.button3.Click += new System.EventHandler(this.btnSelectAllTree_Click);
             // 

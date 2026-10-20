@@ -24,13 +24,14 @@ namespace Primexcel
 
             if (!File.Exists(excelFilePath))
             {
-                Console.WriteLine($"[BŁĄD] Plik Excela nie istnieje: {excelFilePath}");
+                Console.WriteLine($"[ERROR] Excel file does not exist: {excelFilePath}");
                 return;
             }
 
             using (XLWorkbook workbook = new XLWorkbook(excelFilePath))
             {
                 // Buforowanie sterowników PLC z TIA Portal w pamięci RAM
+                // (Buffering PLC controllers from TIA Portal in RAM)
                 var plcMap = new Dictionary<string, PlcSoftware>(StringComparer.OrdinalIgnoreCase);
                 foreach (Device device in project.Devices)
                 {
@@ -49,15 +50,16 @@ namespace Primexcel
                 {
                     if (!plcMap.TryGetValue(target.PlcName, out PlcSoftware plcSoftware))
                     {
-                        Console.WriteLine($"[OSTRZEŻENIE] Nie znaleziono sterownika '{target.PlcName}'. Pomijanie.");
+                        Console.WriteLine($"[WARNING] Controller '{target.PlcName}' not found. Skipping.");
                         continue;
                     }
 
                     // Szukanie bloku DB w TIA Portal po podanej ścieżce
+                    // (Searching for DB block in TIA Portal by specified path)
                     var blockResult = FindBlockAndParentGroup(plcSoftware, target.DbPath);
                     if (blockResult.Block == null)
                     {
-                        Console.WriteLine($"[OSTRZEŻENIE] Nie znaleziono bloku pod ścieżką '{target.DbPath}'. Pomijanie.");
+                        Console.WriteLine($"[WARNING] Block not found under path '{target.DbPath}'. Skipping.");
                         continue;
                     }
 
@@ -67,7 +69,7 @@ namespace Primexcel
 
                     if (!workbook.Worksheets.Contains(safeSheetName))
                     {
-                        Console.WriteLine($"[OSTRZEŻENIE] Nie znaleziono arkusza '{safeSheetName}' w pliku Excel. Pomijanie.");
+                        Console.WriteLine($"[WARNING] Worksheet '{safeSheetName}' not found in Excel file. Skipping.");
                         continue;
                     }
 
@@ -82,15 +84,15 @@ namespace Primexcel
 
                 if (anyUpdated)
                 {
-                    Console.WriteLine("\nZapisywanie zmian w projekcie TIA Portal...");
+                    Console.WriteLine("\nSaving changes to TIA Portal project...");
                     project.Save();
                     Console.WriteLine("==========================================");
-                    Console.WriteLine("SUKCES: Dane zostały zaimportowane i projekt został zapisany!");
+                    Console.WriteLine("SUCCESS: Data imported and project saved successfully!");
                     Console.WriteLine("==========================================");
                 }
                 else
                 {
-                    Console.WriteLine("\n[INFORMACJA] Nie dokonano żadnych zmian w projekcie.");
+                    Console.WriteLine("\n[INFO] No changes were made to the project.");
                 }
             }
         }
@@ -98,39 +100,39 @@ namespace Primexcel
         private static bool ProcessSingleDbImport(PlcBlock dbBlock, PlcBlockGroup parentGroup, PlcSoftware plcSoftware, string plcName, Dictionary<string, (string ValueToSet, string Comment)> excelData)
         {
             string dbName = dbBlock.Name;
-            Console.WriteLine($" -> Importowanie danych do bloku '{dbName}' ({plcName})...");
+            Console.WriteLine($" -> Importing data to block '{dbName}' ({plcName})...");
 
             string tempXmlPath = Path.Combine(Path.GetTempPath(), $"{plcName}_{dbName}_Import.xml");
             try
             {
-                // 1. Eksport obecnie istniejącego bloku DB do tymczasowego XML
+                // 1. Eksport obecnie istniejącego bloku DB do tymczasowego XML (1. Export current DB block to temporary XML)
                 dbBlock.Export(new FileInfo(tempXmlPath), ExportOptions.WithDefaults);
 
-                // 2. Modyfikacja pliku XML na podstawie danych z Excela
+                // 2. Modyfikacja pliku XML na podstawie danych z Excela (2. Modify XML file based on Excel data)
                 bool modified = ModifyXmlWithExcelData(tempXmlPath, excelData);
                 if (!modified)
                 {
-                    Console.WriteLine($" -> [INFORMACJA] Brak zmian do wprowadzenia dla '{dbName}'.");
+                    Console.WriteLine($" -> [INFO] No changes to apply for '{dbName}'.");
                     return false;
                 }
 
-                // 3. Ponowny import zmodyfikowanego XML (z opcją Override/Nadpisania)
+                // 3. Ponowny import zmodyfikowanego XML (z opcją Override/Nadpisania) (3. Re-import modified XML with Override option)
                 parentGroup.Blocks.Import(new FileInfo(tempXmlPath), ImportOptions.Override);
-                Console.WriteLine($" -> [SUKCES] Zaimportowano zaktualizowany blok '{dbName}'.");
+                Console.WriteLine($" -> [SUCCESS] Updated block '{dbName}' imported.");
 
-                // 4. Kompilacja oprogramowania PLC
-                Console.WriteLine($" -> Kompilowanie sterownika {plcName}...");
+                // 4. Kompilacja oprogramowania PLC (4. PLC software compilation)
+                Console.WriteLine($" -> Compiling controller {plcName}...");
                 ICompilable compilable = plcSoftware.GetService<ICompilable>();
                 if (compilable != null)
                 {
                     var result = compilable.Compile();
                     if (result.ErrorCount > 0)
                     {
-                        Console.WriteLine($" -> [OSTRZEŻENIE] Kompilacja wykazała błędy ({result.ErrorCount}).");
+                        Console.WriteLine($" -> [WARNING] Compilation completed with errors ({result.ErrorCount}).");
                     }
                     else
                     {
-                        Console.WriteLine(" -> Kompilacja zakończona sukcesem.");
+                        Console.WriteLine(" -> Compilation completed successfully.");
                     }
                 }
 
@@ -138,7 +140,7 @@ namespace Primexcel
             }
             catch (Exception ex)
             {
-                Console.WriteLine($" -> [BŁĄD] Podczas importu bloku '{dbName}' w {plcName}: {ex.Message}");
+                Console.WriteLine($" -> [ERROR] While importing block '{dbName}' in {plcName}: {ex.Message}");
                 return false;
             }
             finally

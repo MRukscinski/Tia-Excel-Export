@@ -26,10 +26,6 @@ namespace Test_Opennes_Clanker
 
     public partial class frontForm : Form
     {
-        private const int MaxLevelColumns = 8; // Liczba kolumn na poziomy zagnieżdżenia (A-H)
-
-        private static long _idCounter = 0; //
-        
         //----------------------------
         public int[] mySelectedIndex { get; private set; } = new int[0];
         public string NazwaCsvDir { get; private set; }

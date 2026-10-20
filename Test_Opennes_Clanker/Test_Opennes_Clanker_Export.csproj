@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{7205F93B-EC48-4A7F-AF28-966C79C5C7CA}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>Test_Opennes_Clanker</RootNamespace>
-    <AssemblyName>Test_Opennes_Clanker</AssemblyName>
+    <RootNamespace>Primexcel2000</RootNamespace>
+    <AssemblyName>Primexcel2000</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -34,6 +34,9 @@
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject />
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>Primetals_Technologieskolo.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="AutoFilterDataGrid, Version=1.0.21221.1631, Culture=neutral, processorArchitecture=MSIL">
@@ -149,6 +152,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\0cb96cf5-dfd1-42a8-91a1-7efefdacd3fb.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Primetals_Technologieskolo.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

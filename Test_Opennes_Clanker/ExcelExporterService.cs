@@ -22,7 +22,7 @@ namespace Primexcel
         {
             if (targets == null || targets.Count == 0) return;
 
-            // 1. JEDNORAZOWE tworzenie kopii zapasowej przed całym procesem
+            // 1. Kopia zapasowa TYLKO wtedy, gdy plik już wcześniej istniał na dysku
             if (File.Exists(excelFilePath))
             {
                 try
@@ -34,25 +34,28 @@ namespace Primexcel
                     string backupPath = Path.Combine(directory ?? "", $"{fileNameWithoutExt}_{timestamp}{extension}");
 
                     File.Copy(excelFilePath, backupPath, true);
-                    Console.WriteLine($"[KOPIA ZAPASOWA] Utworzono kopię: {backupPath}");
+                    Console.WriteLine($"[BACKUP] Created backup file: {backupPath}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[OSTRZEŻENIE] Nie udało się utworzyć kopii zapasowej: {ex.Message}");
+                    Console.WriteLine($"[WARNING] Failed to create backup: {ex.Message}");
                 }
             }
 
-            using (XLWorkbook workbook = new XLWorkbook(excelFilePath))
+            // 2. Jeśli plik istnieje – wczytujemy go; jeśli nie istnieje – tworzymy pusty obiekt XLWorkbook
+            XLWorkbook workbook = File.Exists(excelFilePath) ? new XLWorkbook(excelFilePath) : new XLWorkbook();
+
+            using (workbook)
             {
                 // =========================================================================
-                // 1. CZYSZCZENIE SKOROSZYTU Z ZACHOWANIEM LEGENDY
+                // CZYSZCZENIE Z ZACHOWANIEM LEGENDY
                 // =========================================================================
                 var tempResetSheet = workbook.Worksheets.Add("Temp_Reset_Sheet");
 
-                // Jeśli arkusz 'Legenda' jeszcze nie istnieje, tworzymy go i wypełniamy treścią
+                // Upewniamy się, że arkusz Legendy istnieje
                 EnsureLegendSheetExists(workbook);
 
-                // Wyciągamy nazwy arkuszy do usunięcia (wszystkie OPRÓCZ bufora i Legendy)
+                // Usuwamy stare arkusze DB (zostawiamy Temp_Reset_Sheet oraz Legendę)
                 var existingSheets = workbook.Worksheets
                     .Where(ws => ws.Name != "Temp_Reset_Sheet" &&
                                  !string.Equals(ws.Name, "Legenda", StringComparison.OrdinalIgnoreCase))
@@ -104,22 +107,20 @@ namespace Primexcel
                 // 4. Usunięcie arkusza tymczasowego i zapis skompilowanego pliku
                 if (processedAny && workbook.Worksheets.Count > 1)
                 {
-                    tempResetSheet.Delete(); // Usuwamy bufor tymczasowy
+                    tempResetSheet.Delete();
 
-                    if (workbook.Worksheets.Contains("Legenda"))
+                    if (workbook.Worksheets.Contains("Legend"))
                     {
-                        workbook.Worksheet("Legenda").Position = 1; // Przesuwa zakładkę na sam początek
+                        workbook.Worksheet("Legend").Position = 1;
                     }
 
-                    workbook.Save();
-                    Console.WriteLine("\n==========================================");
-                    Console.WriteLine($"SUKCES: Wyczyściono i zaktualizowano plik Excel:\n{excelFilePath}");
-                    Console.WriteLine("==========================================");
+                    // Zapis do wybranej ścieżki
+                    workbook.SaveAs(excelFilePath);
+                    Console.WriteLine($"\nSUCCESS: Saved Excel file at: {excelFilePath}");
                 }
                 else
                 {
                     tempResetSheet.Delete();
-                    Console.WriteLine("\n[INFORMACJA] Nie wygenerowano żadnego arkusza. Plik pozostał bez zmian.");
                 }
             }
         }

@@ -179,7 +179,6 @@ namespace Primexcel
         TiaPortal tiaPortal = null;
         Project project = null;
         bool shouldDisposeTia = false;
-        string excelFilePath = @"C:\Users\user\Desktop\Generator.xlsm";
         private async void btnProcessSelected_Click(object sender, EventArgs e)
         {
             // 1. Pobieramy zaznaczone indeksy z drzewka
@@ -187,12 +186,42 @@ namespace Primexcel
 
             if (mySelectedIndex == null || mySelectedIndex.Length == 0)
             {
-                MessageBox.Show("Nie zaznaczono żadnego elementu w drzewku!",
-                                "Ostrzeżenie", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Select at least one DB block from the tree view!",
+                                "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // 2. Walidacja nazwy pliku CSV
+            // 2. Okno wyboru ścieżki i nazwy pliku do zapisu (SaveFileDialog)
+            string selectedExcelPath = string.Empty;
+
+            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+            {
+                saveFileDialog.Title = "Select directory and filename for Excel export";
+                saveFileDialog.Filter = "Excel Workbook (*.xlsx)|*.xlsx|Excel Macro-Enabled Workbook (*.xlsm)|*.xlsm|All Files (*.*)|*.*";
+                saveFileDialog.FilterIndex = 1;
+                saveFileDialog.RestoreDirectory = true;
+                // Pobieramy nazwę projektu z pola tekstowego (np. 'HDVU_Ternium')
+                string rawProjectName = Path.GetFileNameWithoutExtension(textBox1.Text.Trim());
+                string safeProjectName = !string.IsNullOrWhiteSpace(rawProjectName) ? rawProjectName : "Export_DB";
+
+                // Tworzymy czytelną nazwę z datą, np. "HDVU_Ternium_Export_20.10.2026.xlsx"
+                string suggestedFileName = $"{safeProjectName}_Export_{DateTime.Now:dd.MM.yyyy}.xlsx";
+
+                // Ustawiamy wygenerowaną prozycję w oknie dialogowym
+                saveFileDialog.FileName = suggestedFileName;
+
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    selectedExcelPath = saveFileDialog.FileName;
+                }
+                else
+                {
+                    // Użytkownik anulował wybór pliku - przerywamy działanie
+                    return;
+                }
+            }
+
+            // 3. Walidacja pliku CSV
             if (string.IsNullOrEmpty(NazwaCsvDir))
             {
                 NazwaCsvDir = "lista_ster_bloki_DB.csv";
@@ -201,19 +230,19 @@ namespace Primexcel
             string csvFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
             if (!File.Exists(csvFullPath))
             {
-                MessageBox.Show($"Brak pliku CSV pod ścieżką:\n{csvFullPath}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"CSV map file not found at:\n{csvFullPath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            // 3. Walidacja ścieżki projektu TIA
+            // 4. Walidacja ścieżki projektu TIA
             string projectPath = textBox1.Text.Trim();
             if (!File.Exists(projectPath))
             {
-                MessageBox.Show("Wskazany plik projektu TIA Portal nie istnieje!", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Specified TIA Portal project file does not exist!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            // 4. Odczyt linii pliku CSV i przygotowanie listy do eksportu
+            // 5. Odczyt linii z CSV i przygotowanie celów do eksportu
             string[] lines = File.ReadAllLines(csvFullPath);
             List<(string PlcName, string DbPath)> targetsToExport = new List<(string, string)>();
 
@@ -245,11 +274,11 @@ namespace Primexcel
 
             if (targetsToExport.Count == 0)
             {
-                MessageBox.Show("Nie udało się odczytać ścieżek z zaznaczonych elementów CSV.", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Failed to parse paths from selected CSV rows.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // 5. Start animacji ładowania oraz zablokowanie przycisku
+            // 6. Start animacji ładowania oraz zablokowanie przycisku
             ToggleLoadingAnimation();
             button2.Enabled = false;
 
@@ -274,24 +303,22 @@ namespace Primexcel
 
                     if (project == null)
                     {
-                        throw new Exception("Nie udało się pobrać referencji do projektu TIA Portal.");
+                        throw new Exception("Unable to acquire TIA Portal project reference.");
                     }
 
-                    // Zbiorczy, szybki eksport wybranych bloków DB w pamięci RAM
-
-                    ExcelExporterService.ExportSelectedDbsToExcel(project, excelFilePath, targetsToExport);
+                    // Przekazujemy ścieżkę wybraną przez użytkownika w SaveFileDialog!
+                    ExcelExporterService.ExportSelectedDbsToExcel(project, selectedExcelPath, targetsToExport);
                 });
 
-                MessageBox.Show("Eksport wybranych bloków zakończony sukcesem!", "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Selected DB blocks exported successfully!\n\nFile saved at:\n{selectedExcelPath}",
+                                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"[BŁĄD KRYTYCZNY]: {ex.Message}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Console.WriteLine($"\n[BŁĄD KRYTYCZNY] {ex.Message}");
+                MessageBox.Show($"[CRITICAL ERROR]: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
-                // Asynchroniczne zamykanie sesji TIA w tle (jeśli była otwierana przez aplikację)
                 if (shouldDisposeTia && tiaPortal != null)
                 {
                     await Task.Run(() =>
@@ -303,7 +330,6 @@ namespace Primexcel
                     });
                 }
 
-                // Zatrzymanie animacji i odblokowanie przycisku UI
                 ToggleLoadingAnimation();
                 button2.Enabled = true;
             }

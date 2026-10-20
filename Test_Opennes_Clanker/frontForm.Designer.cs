@@ -1,4 +1,4 @@
-﻿namespace Test_Opennes_Clanker
+﻿namespace Primexcel
 {
     partial class frontForm
     {

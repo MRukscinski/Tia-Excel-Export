@@ -12,7 +12,7 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
     public static class ExcelImporterService
     {
@@ -95,7 +95,7 @@ namespace Test_Opennes_Clanker
             }
         }
 
-        private static bool ProcessSingleDbImport(PlcBlock dbBlock, PlcBlockGroup parentGroup, PlcSoftware plcSoftware, string plcName, Dictionary<string, (string StartVal, string Comment)> excelData)
+        private static bool ProcessSingleDbImport(PlcBlock dbBlock, PlcBlockGroup parentGroup, PlcSoftware plcSoftware, string plcName, Dictionary<string, (string ValueToSet, string Comment)> excelData)
         {
             string dbName = dbBlock.Name;
             Console.WriteLine($" -> Importowanie danych do bloku '{dbName}' ({plcName})...");
@@ -152,7 +152,7 @@ namespace Test_Opennes_Clanker
 
         #region Metody Pomocnicze
 
-        private static Dictionary<string, (string StartVal, string Comment)> ReadSheetData(IXLWorksheet worksheet)
+        private static Dictionary<string, (string ValueToSet, string Comment)> ReadSheetData(IXLWorksheet worksheet)
         {
             var rowsDict = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase);
             int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 0;
@@ -172,17 +172,28 @@ namespace Test_Opennes_Clanker
                 if (pathParts.Count > 0)
                 {
                     string fullPathKey = string.Join(".", pathParts);
-                    string startValue = worksheet.Cell(row, MaxLevelColumns + 2).Value.ToString().Trim();
-                    string comment = worksheet.Cell(row, MaxLevelColumns + 3).Value.ToString().Trim();
 
-                    rowsDict[fullPathKey] = (startValue, comment);
+                    // Odczyt obecnej wartości ze sterownika (Kolumna J -> MaxLevelColumns + 2)
+                    string valueFromPlc = worksheet.Cell(row, MaxLevelColumns + 2).Value.ToString().Trim();
+
+                    // Odczyt nowej wartości do wpisania (Kolumna K -> MaxLevelColumns + 3)
+                    string valueToSet = worksheet.Cell(row, MaxLevelColumns + 3).Value.ToString().Trim();
+
+                    // Odczyt komentarza (Kolumna L -> MaxLevelColumns + 4)
+                    string comment = worksheet.Cell(row, MaxLevelColumns + 4).Value.ToString().Trim();
+
+                    // Jeśli użytkownik wpisał nową wartość w kolumnę "Wartość do Wpisania", używamy jej.
+                    // Jeśli zostawił puste pole, zachowujemy dotychczasową wartość ze sterownika!
+                    string finalValue = !string.IsNullOrEmpty(valueToSet) ? valueToSet : valueFromPlc;
+
+                    rowsDict[fullPathKey] = (finalValue, comment);
                 }
             }
 
             return rowsDict;
         }
 
-        private static bool ModifyXmlWithExcelData(string xmlPath, Dictionary<string, (string StartVal, string Comment)> excelRows)
+        private static bool ModifyXmlWithExcelData(string xmlPath, Dictionary<string, (string ValueToSet, string Comment)> excelRows)
         {
             XDocument doc = XDocument.Load(xmlPath);
             var interfaceElem = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "Interface");
@@ -205,7 +216,7 @@ namespace Test_Opennes_Clanker
             return true;
         }
 
-        private static void UpdateMemberNode(XElement memberElem, List<string> currentPath, Dictionary<string, (string StartVal, string Comment)> excelRows)
+        private static void UpdateMemberNode(XElement memberElem, List<string> currentPath, Dictionary<string, (string ValueToSet, string Comment)> excelRows)
         {
             string name = memberElem.Attribute("Name")?.Value ?? string.Empty;
             if (string.IsNullOrEmpty(name)) return;
@@ -219,18 +230,14 @@ namespace Test_Opennes_Clanker
 
                 // 1. Aktualizacja StartValue
                 XElement startValElem = memberElem.Elements().FirstOrDefault(e => e.Name.LocalName == "StartValue");
-                if (!string.IsNullOrEmpty(excelValues.StartVal))
+                if (!string.IsNullOrEmpty(excelValues.ValueToSet))
                 {
                     if (startValElem == null)
                     {
                         startValElem = new XElement(ns + "StartValue");
                         memberElem.Add(startValElem);
                     }
-                    startValElem.Value = excelValues.StartVal;
-                }
-                else if (startValElem != null)
-                {
-                    startValElem.Remove();
+                    startValElem.Value = excelValues.ValueToSet;
                 }
 
                 // 2. Aktualizacja Komentarza
@@ -256,12 +263,12 @@ namespace Test_Opennes_Clanker
                 }
             }
 
-            // Przetwarzanie podstruktury
+            // Przetwarzanie podstruktury (drzewa)
             List<XElement> childMembers = new List<XElement>();
             childMembers.AddRange(memberElem.Elements().Where(e => e.Name.LocalName == "Member"));
 
             var nestedSections = memberElem.Elements().Where(e => e.Name.LocalName == "Sections")
-                                           .Elements().Where(e => e.Name.LocalName == "Section");
+                                                   .Elements().Where(e => e.Name.LocalName == "Section");
 
             foreach (var sec in nestedSections)
             {

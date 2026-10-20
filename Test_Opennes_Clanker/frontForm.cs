@@ -21,7 +21,7 @@ using System.Xml.Linq;
 using Path = System.IO.Path;
 
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
 
     public partial class frontForm : Form
@@ -510,13 +510,13 @@ namespace Test_Opennes_Clanker
 
         private async void btnImportSelected_Click(object sender, EventArgs e)
         {
-            // 1. Otwarcie okienka dialogowego do wyboru pliku Excel przez użytkownika
+            // 1. Wybór pliku Excel przez użytkownika
             string excelFilePath = string.Empty;
 
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
-                openFileDialog.Title = "Wybierz plik Excel do importu";
-                openFileDialog.Filter = "Pliki Excela (*.xlsx;*.xlsm)|*.xlsx;*.xlsm|Wszystkie pliki (*.*)|*.*";
+                openFileDialog.Title = "Select Excel File to Import";
+                openFileDialog.Filter = "Excel Files (*.xlsx;*.xlsm)|*.xlsx;*.xlsm|All Files (*.*)|*.*";
                 openFileDialog.InitialDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
@@ -525,32 +525,20 @@ namespace Test_Opennes_Clanker
                 }
                 else
                 {
-                    // Użytkownik anulował wybór pliku
-                    return;
+                    return; // Użytkownik anulował
                 }
             }
 
-            // 2. Pobieramy zaznaczone indeksy z drzewka
-            mySelectedIndex = GetSelectedCsvRowIndices();
-
-            //if (mySelectedIndex == null || mySelectedIndex.Length == 0)
-            //{
-            //    MessageBox.Show("Nie zaznaczono żadnego elementu w drzewku!",
-            //                    "Ostrzeżenie", MessageBoxButtons.MessageBoxButtons == MessageBoxButtons.OK ? MessageBoxButtons.OK : MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            //    return;
-            //}
-
-            // 1. Pobieramy zaznaczone indeksy z drzewka
+            // 2. Pobranie zaznaczonych elementów z drzewka
             mySelectedIndex = GetSelectedCsvRowIndices();
 
             if (mySelectedIndex == null || mySelectedIndex.Length == 0)
             {
-                MessageBox.Show("Nie zaznaczono żadnego elementu w drzewku!",
-                                "Ostrzeżenie", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("No items selected in the tree view!", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // 2. Walidacja nazwy pliku CSV
+            // 3. Walidacja pliku CSV z mapą zagnieżdżeń
             if (string.IsNullOrEmpty(NazwaCsvDir))
             {
                 NazwaCsvDir = "lista_ster_bloki_DB.csv";
@@ -559,19 +547,11 @@ namespace Test_Opennes_Clanker
             string csvFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
             if (!File.Exists(csvFullPath))
             {
-                MessageBox.Show($"Brak pliku CSV pod ścieżką:\n{csvFullPath}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"CSV file not found at:\n{csvFullPath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            // 3. Walidacja ścieżki projektu TIA
-            string projectPath = textBox1.Text.Trim();
-            if (!File.Exists(projectPath))
-            {
-                MessageBox.Show("Wskazany plik projektu TIA Portal nie istnieje!", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            // 4. Odczyt linii pliku CSV i przygotowanie listy celów do importu
+            // 4. Odczyt linii z CSV i wyciągnięcie celów do importu
             string[] lines = File.ReadAllLines(csvFullPath);
             List<(string PlcName, string DbPath)> targetsToImport = new List<(string, string)>();
 
@@ -603,14 +583,11 @@ namespace Test_Opennes_Clanker
 
             if (targetsToImport.Count == 0)
             {
-                MessageBox.Show("Nie udało się odczytać ścieżek z zaznaczonych elementów CSV.", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Failed to parse paths from selected CSV rows.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Stała nazwa pliku Excel dla generatora (zgodnie z wytycznymi)
-            //string excelFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Generator.xlsm");
-
-            // 5. Start animacji ładowania oraz zablokowanie przycisku
+            // 5. Wykonanie importu w tle (Task.Run) z blokadą interfejsu
             ToggleLoadingAnimation();
             button2.Enabled = false;
 
@@ -618,7 +595,6 @@ namespace Test_Opennes_Clanker
             {
                 await Task.Run(() =>
                 {
-                    // Podłączenie pod istniejącą instancję TIA lub otwarcie nowej w tle
                     var processes = TiaPortal.GetProcesses();
                     if (processes.Count > 0)
                     {
@@ -628,6 +604,7 @@ namespace Test_Opennes_Clanker
                     }
                     else
                     {
+                        string projectPath = textBox1.Text.Trim();
                         tiaPortal = new TiaPortal(TiaPortalMode.WithoutUserInterface);
                         project = tiaPortal.Projects.Open(new FileInfo(projectPath));
                         shouldDisposeTia = true;
@@ -635,23 +612,21 @@ namespace Test_Opennes_Clanker
 
                     if (project == null)
                     {
-                        throw new Exception("Nie udało się pobrać referencji do projektu TIA Portal.");
+                        throw new Exception("Unable to acquire TIA Portal project reference.");
                     }
 
-                    // Wywołanie usługi importu z pliku Excel do TIA Portal dla wybranych bloków DB
+                    // Wywołanie usługi importu z Excela do TIA Portal
                     ExcelImporterService.ImportSelectedDbsFromExcel(project, excelFilePath, targetsToImport);
                 });
 
-                
+                MessageBox.Show("Selected DB blocks imported successfully from Excel!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"[BŁĄD KRYTYCZNY]: {ex.Message}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Console.WriteLine($"\n[BŁĄD KRYTYCZNY] {ex.Message}");
+                MessageBox.Show($"[CRITICAL ERROR]: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
-                // Asynchroniczne zamykanie sesji TIA w tle (jeśli była otwierana przez aplikację)
                 if (shouldDisposeTia && tiaPortal != null)
                 {
                     await Task.Run(() =>
@@ -663,9 +638,7 @@ namespace Test_Opennes_Clanker
                     });
                 }
 
-                // Zatrzymanie animacji i odblokowanie przycisku UI
                 ToggleLoadingAnimation();
-                MessageBox.Show("Import wybranych bloków z Excela zakończony sukcesem!", "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 button2.Enabled = true;
             }
         }

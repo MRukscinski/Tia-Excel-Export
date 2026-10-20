@@ -12,7 +12,7 @@ using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
-using Test_Opennes_Clanker;
+using Primexcel;
 
 using WinFormsApp = System.Windows.Forms.Application;
 

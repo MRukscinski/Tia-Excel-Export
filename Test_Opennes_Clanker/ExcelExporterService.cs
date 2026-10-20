@@ -12,7 +12,7 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
     public static class ExcelExporterService
     {
@@ -45,13 +45,19 @@ namespace Test_Opennes_Clanker
             using (XLWorkbook workbook = new XLWorkbook(excelFilePath))
             {
                 // =========================================================================
-                // 2. CZYSZCZENIE SKOROSZYTU PRZED KAŻDYM WYWOŁANIEM
+                // 1. CZYSZCZENIE SKOROSZYTU Z ZACHOWANIEM LEGENDY
                 // =========================================================================
-                // ClosedXML wymaga obecności co najmniej 1 arkusza w pliku Excel.
-                // Tworzymy bufor tymczasowy, usuwamy stare arkusze, a po wygenerowaniu nowych go kasujemy.
                 var tempResetSheet = workbook.Worksheets.Add("Temp_Reset_Sheet");
 
-                var existingSheets = workbook.Worksheets.Where(ws => ws.Name != "Temp_Reset_Sheet").ToList();
+                // Jeśli arkusz 'Legenda' jeszcze nie istnieje, tworzymy go i wypełniamy treścią
+                EnsureLegendSheetExists(workbook);
+
+                // Wyciągamy nazwy arkuszy do usunięcia (wszystkie OPRÓCZ bufora i Legendy)
+                var existingSheets = workbook.Worksheets
+                    .Where(ws => ws.Name != "Temp_Reset_Sheet" &&
+                                 !string.Equals(ws.Name, "Legenda", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
                 foreach (var sheet in existingSheets)
                 {
                     sheet.Delete();
@@ -98,16 +104,20 @@ namespace Test_Opennes_Clanker
                 // 4. Usunięcie arkusza tymczasowego i zapis skompilowanego pliku
                 if (processedAny && workbook.Worksheets.Count > 1)
                 {
-                    tempResetSheet.Delete(); // Usuwamy bufor, bo Mamy już nowe arkusze
-                    workbook.Save();
+                    tempResetSheet.Delete(); // Usuwamy bufor tymczasowy
 
+                    if (workbook.Worksheets.Contains("Legenda"))
+                    {
+                        workbook.Worksheet("Legenda").Position = 1; // Przesuwa zakładkę na sam początek
+                    }
+
+                    workbook.Save();
                     Console.WriteLine("\n==========================================");
                     Console.WriteLine($"SUKCES: Wyczyściono i zaktualizowano plik Excel:\n{excelFilePath}");
                     Console.WriteLine("==========================================");
                 }
                 else
                 {
-                    // Jeśli żaden blok nie został poprawnie przetworzony, wycofujemy tymczasowy arkusz
                     tempResetSheet.Delete();
                     Console.WriteLine("\n[INFORMACJA] Nie wygenerowano żadnego arkusza. Plik pozostał bez zmian.");
                 }
@@ -162,7 +172,9 @@ namespace Test_Opennes_Clanker
 
                 IXLWorksheet worksheet = workbook.Worksheets.Add(safeSheetName);
 
-                // Nagłówki poziomów (A - H)
+                // =========================================================================
+                // 1. NAGŁÓWKI POZIOMÓW DRZEWA (Kolumny A - H)
+                // =========================================================================
                 for (int level = 1; level <= MaxLevelColumns; level++)
                 {
                     int levelFromRight = MaxLevelColumns - level + 1;
@@ -171,18 +183,28 @@ namespace Test_Opennes_Clanker
                         : $"Poziom -{levelFromRight}";
                 }
 
-                // Nagłówki właściwości
+                // =========================================================================
+                // 2. NAGŁÓWKI WŁAŚCIWOŚCI (Kolumny I, J, K, L)
+                // =========================================================================
                 worksheet.Cell(1, MaxLevelColumns + 1).Value = "Typ Danych";
-                worksheet.Cell(1, MaxLevelColumns + 2).Value = "Wartość Początkowa";
-                worksheet.Cell(1, MaxLevelColumns + 3).Value = "Komentarz";
+                worksheet.Cell(1, MaxLevelColumns + 2).Value = "Wartość ze Sterownika";
+                worksheet.Cell(1, MaxLevelColumns + 3).Value = "Wartość do Wpisania"; // <- Nowa kolumna
+                worksheet.Cell(1, MaxLevelColumns + 4).Value = "Komentarz";
 
-                // Formatowanie nagłówka
-                var headerRange = worksheet.Range(1, 1, 1, MaxLevelColumns + 3);
+                // Formatowanie nagłówka (zmieniła się całkowita szerokość: MaxLevelColumns + 4)
+                int totalColumns = MaxLevelColumns + 4;
+                var headerRange = worksheet.Range(1, 1, 1, totalColumns);
                 headerRange.Style.Font.Bold = true;
                 headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
                 headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                // Wypełnianie danych
+                // Wyróżnienie kolumny "Wartość do Wpisania" innym kolorem (np. jasnoniebieskim),
+                // aby użytkownik wiedział, gdzie ma wpisywać nowe dane
+                worksheet.Cell(1, MaxLevelColumns + 3).Style.Fill.BackgroundColor = XLColor.FromHtml("#D9E1F2");
+
+                // =========================================================================
+                // 3. WYPEŁNIANIE DANYCH
+                // =========================================================================
                 int currentRow = 2;
                 foreach (var param in parameters)
                 {
@@ -195,14 +217,23 @@ namespace Test_Opennes_Clanker
 
                     int startColumn = MaxLevelColumns - path.Count + 1;
 
+                    // Zapis drzewka ścieżki
                     for (int i = 0; i < path.Count; i++)
                     {
                         worksheet.Cell(currentRow, startColumn + i).Value = path[i];
                     }
 
+                    // Typ Danych
                     worksheet.Cell(currentRow, MaxLevelColumns + 1).Value = param.DataType;
+
+                    // Wartość ze Sterownika (aktualny stan w DB)
                     worksheet.Cell(currentRow, MaxLevelColumns + 2).Value = param.StartValue;
-                    worksheet.Cell(currentRow, MaxLevelColumns + 3).Value = param.Comment;
+
+                    // Wartość do Wpisania (zostawiamy puste dla użytkownika)
+                    worksheet.Cell(currentRow, MaxLevelColumns + 3).Value = string.Empty;
+
+                    // Komentarz
+                    worksheet.Cell(currentRow, MaxLevelColumns + 4).Value = param.Comment;
 
                     currentRow++;
                 }
@@ -369,7 +400,57 @@ namespace Test_Opennes_Clanker
         }
 
         #endregion
+        #region Metody Pomocnicze - Legenda
+
+        /// <summary>
+        /// Tworzy i formatuje arkusz Legendy, jeśli nie istnieje w pliku Excel.
+        /// </summary>
+        private static void EnsureLegendSheetExists(XLWorkbook workbook)
+        {
+            string legendSheetName = "Legenda";
+
+            if (workbook.Worksheets.Contains(legendSheetName))
+            {
+                return; // Legenda już istnieje, nic nie robimy
+            }
+
+            IXLWorksheet legendWs = workbook.Worksheets.Add(legendSheetName);
+
+            // Tytuł Legendy
+            legendWs.Cell(1, 1).Value = "LEGENDA I OPIS KOLUMN";
+            legendWs.Cell(1, 1).Style.Font.Bold = true;
+            legendWs.Cell(1, 1).Style.Font.FontSize = 14;
+
+            // Nagłówki tabeli opisowej
+            legendWs.Cell(3, 1).Value = "Nazwa Kolumny";
+            legendWs.Cell(3, 2).Value = "Opis / Przeznaczenie";
+
+            var headerRange = legendWs.Range(3, 1, 3, 2);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+            // Opisy poszczególnych kolumn z arkuszy DB
+            int row = 4;
+            AddLegendRow(legendWs, ref row, "Poziom -X / Nazwa Zmiennej", "Drzewiasta struktura zmiennej w bloku DB.");
+            AddLegendRow(legendWs, ref row, "Typ Danych", "Typ danych w PLC (np. BOOL, INT, REAL, STRING).");
+            AddLegendRow(legendWs, ref row, "Wartość ze Sterownika", "Wartość odczytana z projektu TIA Portal / bloku DB.");
+            AddLegendRow(legendWs, ref row, "Wartość do Wpisania", "Pole edytowalne (wyróżnione kolorem) przeznaczone do wprowadzenia nowych wartości.");
+            AddLegendRow(legendWs, ref row, "Komentarz", "Komentarz przypisany do zmiennej w TIA Portal.");
+
+            legendWs.Columns().AdjustToContents();
+        }
+
+        private static void AddLegendRow(IXLWorksheet ws, ref int row, string colName, string description)
+        {
+            ws.Cell(row, 1).Value = colName;
+            ws.Cell(row, 1).Style.Font.Bold = true;
+            ws.Cell(row, 2).Value = description;
+            row++;
+        }
+
+        #endregion
     }
+
 
     public class DbParameterRow
     {
@@ -378,4 +459,5 @@ namespace Test_Opennes_Clanker
         public string StartValue { get; set; }
         public string Comment { get; set; }
     }
+
 }

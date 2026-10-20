@@ -9,7 +9,7 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
     public static class TiaPortalService
     {

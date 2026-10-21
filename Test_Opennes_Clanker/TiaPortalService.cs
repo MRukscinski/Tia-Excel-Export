@@ -91,28 +91,6 @@ namespace Primexcel
             }
         }
 
-        /// <summary>
-        /// Pobiera lub dołącza do instancji TIA Portal. (Retrieves or attaches to a TIA Portal instance.)
-        /// </summary>
-        public static TiaPortal GetOrAttachTiaPortal(string projectPath, out Project project, out bool createdNewInstance)
-        {
-            var processes = TiaPortal.GetProcesses();
-            if (processes.Count > 0)
-            {
-                var tia = processes[0].Attach();
-                project = tia.Projects.FirstOrDefault();
-                createdNewInstance = false;
-                return tia;
-            }
-            else
-            {
-                var tia = new TiaPortal(TiaPortalMode.WithoutUserInterface);
-                project = tia.Projects.Open(new FileInfo(projectPath));
-                createdNewInstance = true;
-                return tia;
-            }
-        }
-
         #region Metody Pomocnicze Skanowania TIA / TIA Scanning Helper Methods
 
         private static void ScanDevicesInProject(Project project, StreamWriter writer)

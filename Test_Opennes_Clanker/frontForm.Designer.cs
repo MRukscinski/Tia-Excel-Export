@@ -130,7 +130,6 @@
             this.groupBox1.TabIndex = 13;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Select Project to Export / Open Active Project";
-            this.groupBox1.Enter += new System.EventHandler(this.groupBox1_Enter);
             // 
             // groupBox2
             // 
@@ -144,7 +143,6 @@
             this.groupBox2.TabIndex = 14;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Select Excel file to Import to Project";
-            this.groupBox2.Enter += new System.EventHandler(this.groupBox2_Enter);
             // 
             // imageList1
             // 

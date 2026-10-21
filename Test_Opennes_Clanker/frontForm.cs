@@ -119,7 +119,7 @@ namespace Primexcel
 
                     if (runningProcesses.Count == 0)
                     {
-                        throw new Exception("Nie znaleziono uruchomionej instancji TIA Portal!");
+                        throw new Exception("No running TIA Portal instance found!");
                     }
 
                     TiaPortal runningTiaProcess = runningProcesses[0].Attach();
@@ -148,15 +148,13 @@ namespace Primexcel
 
                     if (string.IsNullOrEmpty(detectedProjectPath))
                     {
-                        throw new Exception("Brak otwartego projektu lub sesji lokalnej w wykrytej instancji TIA Portal.");
+                        throw new Exception("No open project or local session found in the detected TIA Portal instance.");
                     }
                 });
 
                 // Wpisywanie danych do kontrolerów UI
                 textBox1.Text = detectedProjectPath;
 
-                MessageBox.Show($"Pomyślnie połączono z projektem TIA Portal:\n{projectName}\n\nŚcieżka: {detectedProjectPath}",
-                                "TIA Openness Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 NazwaCsvDir = "lista_ster_bloki_DB.csv";
                 ToggleLoadingAnimation();
@@ -175,29 +173,13 @@ namespace Primexcel
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Błąd podczas detekcji TIA Portal:\n{ex.Message}",
-                                "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error during TIA Portal detection:\n{ex.Message}",
+                        "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
                 ToggleLoadingAnimation();
                 button1.Enabled = true;
-            }
-        }
-        private void btnLoadCsv_Click(object sender, EventArgs e) //TYMCZASOWE
-        {
-            using (OpenFileDialog openFileDialog = new OpenFileDialog())
-            {
-                openFileDialog.Title = "Wybierz plik CSV z blockami DB";
-                openFileDialog.Filter = "Pliki CSV (*.csv)|*.csv|Wszystkie pliki (*.*)|*.*";
-                openFileDialog.FilterIndex = 1;
-                openFileDialog.RestoreDirectory = true;
-
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
-                {
-                    textBox2.Text = openFileDialog.FileName; // Przypisanie ścieżki CSV do TextBox
-                    LoadDataBlocksToTree(openFileDialog.FileName);
-                }
             }
         }
 
@@ -340,7 +322,7 @@ namespace Primexcel
         }
 
 
-        // TREE VIEW TREE VIEW TREE VIEW TREE VIEW TREE VIEW 
+        // TREE VIEW 
         private void LoadDataBlocksToTree(string csvPath)
         {
             try
@@ -427,15 +409,6 @@ namespace Primexcel
             }
         }
 
-        private void btnSelectAllTree_Click(object sender, EventArgs e)
-        {
-            SetAllNodesCheckState(treeViewDB.Nodes, true);
-        }
-
-        private void button4_Click(object sender, EventArgs e)
-        {
-            SetAllNodesCheckState(treeViewDB.Nodes, false);
-        }
         private void SetAllNodesCheckState(TreeNodeCollection nodes, bool isChecked)
         {
             foreach (TreeNode node in nodes)
@@ -509,30 +482,6 @@ namespace Primexcel
                 }
             }
         }
-
-
-        #region Assembly Resolver //CZY TO MA JESZCZE SENS? 0 - REFERENCJI
-        private static Assembly MyResolver(object sender, ResolveEventArgs args)
-        {
-            int index = args.Name.IndexOf(',');
-            if (index == -1) return null;
-
-            string name = args.Name.Substring(0, index);
-            if (name.Equals("Siemens.Engineering", StringComparison.OrdinalIgnoreCase) ||
-                name.Equals("Siemens.Engineering.Hmi", StringComparison.OrdinalIgnoreCase))
-            {
-                string systemPath = @"C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\Siemens.Engineering.dll";
-                if (File.Exists(systemPath))
-                {
-                    return Assembly.LoadFrom(systemPath);
-                }
-            }
-            return null;
-        }
-
-        #endregion
-        //                                                                                                          ^ --------------- WKLEJONE --------------- ^
-
 
         private async void btnImportSelected_Click(object sender, EventArgs e)
         {
@@ -684,11 +633,6 @@ namespace Primexcel
             }
         }
 
-
-        // Metoda inicjalizująca Timer (wywołaj w konstruktorze frontForm())
-
-
-        // Obsługa pojedynczego "tyknięcia" timera
         private void RotationTimer_Tick(object sender, EventArgs e)
         {
             currentAngle = (currentAngle + 3f) % 360f;
@@ -752,16 +696,6 @@ namespace Primexcel
                 rotationTimer.Start();
                 pictureBox1.Invalidate(); // Pierwsze wymuszenie rysowania
             }
-        }
-
-        private void groupBox2_Enter(object sender, EventArgs e)
-        {
-
-        }
-
-        private void groupBox1_Enter(object sender, EventArgs e)
-        {
-
         }
     }   
 }

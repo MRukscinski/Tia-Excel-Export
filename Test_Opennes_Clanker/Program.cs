@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Windows.Forms; //moje 
+using System.Windows.Forms;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -12,18 +12,14 @@ using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
-using Test_Opennes_Clanker;
-//dupapapeja sra
+using Primexcel;
+
 using WinFormsApp = System.Windows.Forms.Application;
 
 namespace TiaDbToExcelExporter
 {
     internal class Program
     {
-
-
-        private const string TargetDbName = "Parameters_DB";
-        private const int MaxLevelColumns = 8; // Liczba kolumn na poziomy zagnieżdżenia (A-H)
 
         [STAThread]
         private static void Main(string[] args)
@@ -33,7 +29,6 @@ namespace TiaDbToExcelExporter
 
             // Tutaj podajesz nazwę swojego formularza:
             Application.Run(new frontForm());
-       
         
         }
 

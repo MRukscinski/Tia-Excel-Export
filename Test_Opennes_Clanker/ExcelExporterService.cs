@@ -12,17 +12,63 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
     public static class ExcelExporterService
     {
         private const int MaxLevelColumns = 8; // Liczba kolumn na poziomy zagnieżdżenia (A-H)
 
+        /// <summary>
+        /// Buduje listę celów (PlcName, DbPath) na podstawie wskazanych indeksów wierszy z pliku CSV.
+        /// </summary>
+        public static List<(string PlcName, string DbPath)> BuildTargetsFromCsv(string csvFullPath, int[] selectedIndices)
+        {
+            var targets = new List<(string PlcName, string DbPath)>();
+
+            if (selectedIndices == null || selectedIndices.Length == 0 || !File.Exists(csvFullPath))
+            {
+                return targets;
+            }
+
+            string[] lines = File.ReadAllLines(csvFullPath);
+
+            foreach (int csvRowIndex in selectedIndices)
+            {
+                if (csvRowIndex < 0 || csvRowIndex >= lines.Length) continue;
+
+                string line = lines[csvRowIndex];
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                string[] columns = line.Split(';');
+                if (columns.Length > 6)
+                {
+                    string targetPlcName = columns[3].Trim('"').Trim();
+                    string fullPathRaw = columns[6].Trim('"').Trim();
+
+                    string projName = columns[2].Trim('"').Trim();
+                    string prefix = $"{projName}/{targetPlcName}/";
+
+                    string targetDbPath = fullPathRaw;
+                    if (fullPathRaw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetDbPath = fullPathRaw.Substring(prefix.Length);
+                    }
+
+                    targets.Add((targetPlcName, targetDbPath));
+                }
+            }
+
+            return targets;
+        }
+
+        /// <summary>
+        /// Główna metoda eksportująca wybrane bloki DB do pliku Excel.
+        /// </summary>
         public static void ExportSelectedDbsToExcel(Project project, string excelFilePath, List<(string PlcName, string DbPath)> targets)
         {
             if (targets == null || targets.Count == 0) return;
 
-            // 1. JEDNORAZOWE tworzenie kopii zapasowej przed całym procesem
+            // 1. Kopia zapasowa, jeśli plik już istniał na dysku
             if (File.Exists(excelFilePath))
             {
                 try
@@ -34,31 +80,34 @@ namespace Test_Opennes_Clanker
                     string backupPath = Path.Combine(directory ?? "", $"{fileNameWithoutExt}_{timestamp}{extension}");
 
                     File.Copy(excelFilePath, backupPath, true);
-                    Console.WriteLine($"[KOPIA ZAPASOWA] Utworzono kopię: {backupPath}");
+                    Console.WriteLine($"[BACKUP] Created backup file: {backupPath}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[OSTRZEŻENIE] Nie udało się utworzyć kopii zapasowej: {ex.Message}");
+                    Console.WriteLine($"[WARNING] Failed to create backup: {ex.Message}");
                 }
             }
 
-            using (XLWorkbook workbook = new XLWorkbook(excelFilePath))
-            {
-                // =========================================================================
-                // 2. CZYSZCZENIE SKOROSZYTU PRZED KAŻDYM WYWOŁANIEM
-                // =========================================================================
-                // ClosedXML wymaga obecności co najmniej 1 arkusza w pliku Excel.
-                // Tworzymy bufor tymczasowy, usuwamy stare arkusze, a po wygenerowaniu nowych go kasujemy.
-                var tempResetSheet = workbook.Worksheets.Add("Temp_Reset_Sheet");
+            // 2. Wczytanie lub utworzenie nowego skoroszytu
+            XLWorkbook workbook = File.Exists(excelFilePath) ? new XLWorkbook(excelFilePath) : new XLWorkbook();
 
-                var existingSheets = workbook.Worksheets.Where(ws => ws.Name != "Temp_Reset_Sheet").ToList();
+            using (workbook)
+            {
+                // Czyszczenie z zachowaniem Legendy
+                var tempResetSheet = workbook.Worksheets.Add("Temp_Reset_Sheet");
+                EnsureLegendSheetExists(workbook);
+
+                var existingSheets = workbook.Worksheets
+                    .Where(ws => ws.Name != "Temp_Reset_Sheet" &&
+                                 !string.Equals(ws.Name, "Legend", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
                 foreach (var sheet in existingSheets)
                 {
                     sheet.Delete();
                 }
-                // =========================================================================
 
-                // Buforowanie sterowników PLC z TIA Portal w pamięci RAM
+                // Buforowanie sterowników w pamięci RAM
                 var plcMap = new Dictionary<string, PlcSoftware>(StringComparer.OrdinalIgnoreCase);
                 foreach (Device device in project.Devices)
                 {
@@ -73,19 +122,18 @@ namespace Test_Opennes_Clanker
 
                 bool processedAny = false;
 
-                // 3. Generowanie nowych arkuszy tylko dla zaznaczonych bloków DB
                 foreach (var target in targets)
                 {
                     if (!plcMap.TryGetValue(target.PlcName, out PlcSoftware plcSoftware))
                     {
-                        Console.WriteLine($"[OSTRZEŻENIE] Nie znaleziono sterownika '{target.PlcName}'. Pomijanie.");
+                        Console.WriteLine($"[WARNING] Controller '{target.PlcName}' not found. Skipping.");
                         continue;
                     }
 
                     PlcBlock dbBlock = FindBlockByPath(plcSoftware, target.DbPath);
                     if (dbBlock == null)
                     {
-                        Console.WriteLine($"[OSTRZEŻENIE] Nie znaleziono bloku pod ścieżką '{target.DbPath}'. Pomijanie.");
+                        Console.WriteLine($"[WARNING] Block not found under path '{target.DbPath}'. Skipping.");
                         continue;
                     }
 
@@ -95,21 +143,21 @@ namespace Test_Opennes_Clanker
                     }
                 }
 
-                // 4. Usunięcie arkusza tymczasowego i zapis skompilowanego pliku
                 if (processedAny && workbook.Worksheets.Count > 1)
                 {
-                    tempResetSheet.Delete(); // Usuwamy bufor, bo Mamy już nowe arkusze
-                    workbook.Save();
+                    tempResetSheet.Delete();
 
-                    Console.WriteLine("\n==========================================");
-                    Console.WriteLine($"SUKCES: Wyczyściono i zaktualizowano plik Excel:\n{excelFilePath}");
-                    Console.WriteLine("==========================================");
+                    if (workbook.Worksheets.Contains("Legend"))
+                    {
+                        workbook.Worksheet("Legend").Position = 1;
+                    }
+
+                    workbook.SaveAs(excelFilePath);
+                    Console.WriteLine($"\nSUCCESS: Saved Excel file at: {excelFilePath}");
                 }
                 else
                 {
-                    // Jeśli żaden blok nie został poprawnie przetworzony, wycofujemy tymczasowy arkusz
                     tempResetSheet.Delete();
-                    Console.WriteLine("\n[INFORMACJA] Nie wygenerowano żadnego arkusza. Plik pozostał bez zmian.");
                 }
             }
         }
@@ -120,19 +168,19 @@ namespace Test_Opennes_Clanker
         private static bool ProcessSingleDbToSheet(PlcBlock dbBlock, PlcSoftware plcSoftware, XLWorkbook workbook, string plcName)
         {
             string dbName = dbBlock.Name;
-            Console.WriteLine($" -> Przetwarzanie bloku '{dbName}' ({plcName})...");
+            Console.WriteLine($" -> Processing block '{dbName}' ({plcName})...");
 
-            // Sprawdzanie spójności / kompilacja
+            // Consistency check / compilation
             if (!dbBlock.IsConsistent)
             {
-                Console.WriteLine($" -> Blok '{dbName}' jest niespójny. Próba kompilacji PLC...");
+                Console.WriteLine($" -> Block '{dbName}' is inconsistent. Attempting PLC compilation...");
                 ICompilable compilable = plcSoftware.GetService<ICompilable>();
                 if (compilable != null)
                 {
                     var result = compilable.Compile();
                     if (result.ErrorCount > 0)
                     {
-                        Console.WriteLine($" -> [BŁĄD] Kompilacja nie powiodła się ({result.ErrorCount} błędów). Pomijanie.");
+                        Console.WriteLine($" -> [ERROR] Compilation failed ({result.ErrorCount} errors). Skipping.");
                         return false;
                     }
                 }
@@ -145,16 +193,16 @@ namespace Test_Opennes_Clanker
             string tempXmlPath = Path.Combine(Path.GetTempPath(), $"{plcName}_{dbName}.xml");
             try
             {
-                // Eksport DB do XML
+                // DB export to XML
                 dbBlock.Export(new FileInfo(tempXmlPath), ExportOptions.WithDefaults);
 
-                // Parsowanie XML
+                // XML parsing
                 List<DbParameterRow> parameters = ParseDbXml(tempXmlPath);
 
                 string rawSheetName = $"{plcName}_{dbName}";
                 string safeSheetName = SanitizeSheetName(rawSheetName);
 
-                // Jeśli arkusz istniał, zastępujemy go
+                // Replace worksheet if it already exists
                 if (workbook.Worksheets.Contains(safeSheetName))
                 {
                     workbook.Worksheets.Worksheet(safeSheetName).Delete();
@@ -162,27 +210,38 @@ namespace Test_Opennes_Clanker
 
                 IXLWorksheet worksheet = workbook.Worksheets.Add(safeSheetName);
 
-                // Nagłówki poziomów (A - H)
+                // =========================================================================
+                // 1. TREE LEVEL HEADERS (Columns A - H)
+                // =========================================================================
                 for (int level = 1; level <= MaxLevelColumns; level++)
                 {
                     int levelFromRight = MaxLevelColumns - level + 1;
                     worksheet.Cell(1, level).Value = levelFromRight == 1
-                        ? "Nazwa Zmiennej"
-                        : $"Poziom -{levelFromRight}";
+                        ? "Variable Name"
+                        : $"Level -{levelFromRight}";
                 }
 
-                // Nagłówki właściwości
-                worksheet.Cell(1, MaxLevelColumns + 1).Value = "Typ Danych";
-                worksheet.Cell(1, MaxLevelColumns + 2).Value = "Wartość Początkowa";
-                worksheet.Cell(1, MaxLevelColumns + 3).Value = "Komentarz";
+                // =========================================================================
+                // 2. PROPERTY HEADERS (Columns I, J, K, L)
+                // =========================================================================
+                worksheet.Cell(1, MaxLevelColumns + 1).Value = "Data Type";
+                worksheet.Cell(1, MaxLevelColumns + 2).Value = "Value from Controller";
+                worksheet.Cell(1, MaxLevelColumns + 3).Value = "Value to Input"; // <- New editable column
+                worksheet.Cell(1, MaxLevelColumns + 4).Value = "Comment";
 
-                // Formatowanie nagłówka
-                var headerRange = worksheet.Range(1, 1, 1, MaxLevelColumns + 3);
+                // Header formatting (total width: MaxLevelColumns + 4)
+                int totalColumns = MaxLevelColumns + 4;
+                var headerRange = worksheet.Range(1, 1, 1, totalColumns);
                 headerRange.Style.Font.Bold = true;
                 headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
                 headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                // Wypełnianie danych
+                // Highlight "Value to Input" column with light blue color for user clarity
+                worksheet.Cell(1, MaxLevelColumns + 3).Style.Fill.BackgroundColor = XLColor.FromHtml("#D9E1F2");
+
+                // =========================================================================
+                // 3. POPULATING DATA
+                // =========================================================================
                 int currentRow = 2;
                 foreach (var param in parameters)
                 {
@@ -195,14 +254,23 @@ namespace Test_Opennes_Clanker
 
                     int startColumn = MaxLevelColumns - path.Count + 1;
 
+                    // Write tree structure path
                     for (int i = 0; i < path.Count; i++)
                     {
                         worksheet.Cell(currentRow, startColumn + i).Value = path[i];
                     }
 
+                    // Data Type
                     worksheet.Cell(currentRow, MaxLevelColumns + 1).Value = param.DataType;
+
+                    // Value from Controller (current DB value)
                     worksheet.Cell(currentRow, MaxLevelColumns + 2).Value = param.StartValue;
-                    worksheet.Cell(currentRow, MaxLevelColumns + 3).Value = param.Comment;
+
+                    // Value to Input (left empty for user input)
+                    worksheet.Cell(currentRow, MaxLevelColumns + 3).Value = string.Empty;
+
+                    // Comment
+                    worksheet.Cell(currentRow, MaxLevelColumns + 4).Value = param.Comment;
 
                     currentRow++;
                 }
@@ -214,12 +282,12 @@ namespace Test_Opennes_Clanker
                     worksheet.RangeUsed().SetAutoFilter();
                 }
 
-                Console.WriteLine($" -> Pomyślnie dodano/zaktualizowano arkusz '{safeSheetName}'.");
+                Console.WriteLine($" -> Successfully added/updated worksheet '{safeSheetName}'.");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($" -> [BŁĄD] Podczas przetwarzania DB w {plcName}: {ex.Message}");
+                Console.WriteLine($" -> [ERROR] While processing DB in {plcName}: {ex.Message}");
                 return false;
             }
             finally
@@ -369,7 +437,57 @@ namespace Test_Opennes_Clanker
         }
 
         #endregion
+        #region Metody Pomocnicze - Legenda
+
+        /// <summary>
+        /// Tworzy i formatuje arkusz Legendy, jeśli nie istnieje w pliku Excel.
+        /// </summary>
+        private static void EnsureLegendSheetExists(XLWorkbook workbook)
+        {
+            string legendSheetName = "Legend";
+
+            if (workbook.Worksheets.Contains(legendSheetName))
+            {
+                return;
+            }
+
+            IXLWorksheet legendWs = workbook.Worksheets.Add(legendSheetName);
+
+            // Title
+            legendWs.Cell(1, 1).Value = "LEGEND AND COLUMN DESCRIPTION";
+            legendWs.Cell(1, 1).Style.Font.Bold = true;
+            legendWs.Cell(1, 1).Style.Font.FontSize = 14;
+
+            // Headers
+            legendWs.Cell(3, 1).Value = "Column Name";
+            legendWs.Cell(3, 2).Value = "Description / Purpose";
+
+            var headerRange = legendWs.Range(3, 1, 3, 2);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+            // Descriptions
+            int row = 4;
+            AddLegendRow(legendWs, ref row, "Level -X / Variable Name", "Tree structure path of the member in the Data Block.");
+            AddLegendRow(legendWs, ref row, "Data Type", "PLC data type (e.g., BOOL, INT, REAL, STRING).");
+            AddLegendRow(legendWs, ref row, "Value from Controller", "Current value read from TIA Portal Data Block.");
+            AddLegendRow(legendWs, ref row, "Value to Input", "Editable field (highlighted in light blue) for entering new values to import.");
+            AddLegendRow(legendWs, ref row, "Comment", "Tag comment defined in TIA Portal.");
+
+            legendWs.Columns().AdjustToContents();
+        }
+
+        private static void AddLegendRow(IXLWorksheet ws, ref int row, string colName, string description)
+        {
+            ws.Cell(row, 1).Value = colName;
+            ws.Cell(row, 1).Style.Font.Bold = true;
+            ws.Cell(row, 2).Value = description;
+            row++;
+        }
+
+        #endregion
     }
+
 
     public class DbParameterRow
     {
@@ -378,4 +496,5 @@ namespace Test_Opennes_Clanker
         public string StartValue { get; set; }
         public string Comment { get; set; }
     }
+
 }

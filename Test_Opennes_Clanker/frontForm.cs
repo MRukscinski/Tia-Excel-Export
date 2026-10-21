@@ -21,15 +21,11 @@ using System.Xml.Linq;
 using Path = System.IO.Path;
 
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
 
     public partial class frontForm : Form
     {
-        private const int MaxLevelColumns = 8; // Liczba kolumn na poziomy zagnieżdżenia (A-H)
-
-        private static long _idCounter = 0; //
-        
         //----------------------------
         public int[] mySelectedIndex { get; private set; } = new int[0];
         public string NazwaCsvDir { get; private set; }
@@ -50,74 +46,131 @@ namespace Test_Opennes_Clanker
             pictureBox1.Paint += PictureBox1_Paint;
         }
 
-        private async void btnBrowse(object sender, EventArgs e) //Szukanie sciezki
+        private async void btnBrowse(object sender, EventArgs e)
         {
+            string selectedPath = string.Empty;
+
+            // 1. Dajemy użytkownikowi wybór: plik projektu (.ap* / .als*) lub folder multiprojektu
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
-                openFileDialog.Title = "Wybierz projekt TIA Portal";
-                openFileDialog.Filter = "Projekty TIA Portal (*.ap*)|*.ap*|Wszystkie pliki (*.*)|*.*";
+                openFileDialog.Title = "Select TIA Portal project or multi-project";
+                openFileDialog.Filter = "All TIA Projects (*.ap*;*.als*)|*.ap*;*.als*|" +
+                                        "Single Projects (*.ap*)|*.ap*|" +
+                                        "Multi-Projects (*.als*)|*.als*|" +
+                                        "All files (*.*)|*.*";
                 openFileDialog.FilterIndex = 1;
                 openFileDialog.RestoreDirectory = true;
 
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    // 1. Przypisanie wybranej ścieżki z pliku do TextBoxa i zmiennej
-                    string projectPath = openFileDialog.FileName;
-                    textBox1.Text = projectPath;
-
-                    // 2. Nazwa pliku CSV z listą zagnieżdżeń
-                    NazwaCsvDir = "lista_ster_bloki_DB.csv";
-
-                    ToggleLoadingAnimation();
-                    try
-                    {
-                        // . Uruchamiamy ciężki eksport na osobnym wątku (UI pozostaje wolny i animacja działa!)
-                        await Task.Run(() =>
-                        {
-                            TiaPortalService.ExportTiaStructureToCsv(projectPath, NazwaCsvDir);
-                        });
-
-                        // 5. Ładowanie do drzewka wykonywane w wątku UI po zakończeniu eksportu
-                        string fullCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
-                        LoadDataBlocksToTree(fullCsvPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Błąd podczas przetwarzania projektu:\n{ex.Message}",
-                                        "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                    finally
-                    {
-                        // 6. Wyłączamy animację ZAWSZE po zakończeniu (nawet jeśli wystąpił błąd)
-                        ToggleLoadingAnimation();
-                    }
-
+                    selectedPath = openFileDialog.FileName;
+                }
+                else
+                {
+                    return; // Użytkownik anulował wybór
                 }
             }
+
+            textBox1.Text = selectedPath;
+            NazwaCsvDir = "lista_ster_bloki_DB.csv";
+
+            ToggleLoadingAnimation();
+            searchBtn.Enabled = false;
+
+            try
+            {
+                // 2. Eksport struktury w tle bez zamrażania interfejsu
+                await Task.Run(() =>
+                {
+                    TiaPortalService.ExportTiaStructureToCsv(selectedPath, NazwaCsvDir);
+                });
+
+                // 3. Wczytanie wygenerowanego CSV do drzewka
+                string fullCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
+                if (File.Exists(fullCsvPath))
+                {
+                    LoadDataBlocksToTree(fullCsvPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during TIA Portal detection:\n{ex.Message}",
+                        "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                ToggleLoadingAnimation();
+                searchBtn.Enabled = true;
+            }
         }
-        private void button1_Click(object sender, EventArgs e)
+        private async void button1_Click(object sender, EventArgs e)
         {
-            // 1. Pobieramy ścieżkę z TextBoxa
-            string projectPath = textBox1.Text.Trim();
+            // 1. Zabezpieczenie interfejsu (start animacji ładowania)
+            
+            button1.Enabled = false;
 
-            // 2. Walidacja: sprawdzenie, czy użytkownik w ogóle podał ścieżkę
-            if (string.IsNullOrWhiteSpace(projectPath))
+            try
             {
-                MessageBox.Show("Najpierw wybierz lub wpisz ścieżkę do projektu TIA Portal!",
-                                "Brak ścieżki", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                TiaPortal runningTiaProcess = null;
+                Project activeProject = null;
+
+                // 2. Praca w tle (Task.Run), aby nie zamrozić interfejsu WinForms
+                await Task.Run(() =>
+                {
+                    // Pobieramy listę wszystkich uruchomionych procesów TIA Portal na komputerze
+                    var runningProcesses = TiaPortal.GetProcesses();
+
+                    if (runningProcesses.Count == 0)
+                    {
+                        throw new Exception("No active TIA Portal instance found!");
+                    }
+
+                    // Podłączamy się pod pierwszy wykryty proces TIA Portal
+                    runningTiaProcess = runningProcesses[0].Attach();
+                    activeProject = runningTiaProcess.Projects.FirstOrDefault();
+
+                    if (activeProject == null)
+                    {
+                        throw new Exception("No open project found in the detected TIA Portal instance.");
+                    }
+                });
+
+                // 3. Automatycznie wpisujemy pełną ścieżkę projektu do textBox1 (w wątku UI)
+                string detectedProjectPath = activeProject.Path.FullName;
+                textBox1.Text = detectedProjectPath;
+
+                MessageBox.Show($"Successfully connected to active TIA Portal project:\n{activeProject.Name}\n\nPath: {detectedProjectPath}",
+                 "TIA Openness Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                NazwaCsvDir = "lista_ster_bloki_DB.csv";
+                ToggleLoadingAnimation();
+
+                // 4. (Opcjonalnie) Możesz od razu wygenerować strukturę CSV z podłączonego projektu
+                //this.NazwaCsvDir = "lista_ster_bloki_DB.csv";
+
+                await Task.Run(() =>
+                {
+                    TiaPortalService.ExportTiaStructureToCsv(detectedProjectPath, NazwaCsvDir);
+                });
+
+                // Automatyczne załadowanie wygenerowanego CSV do drzewka
+                string fullCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
+                if (File.Exists(fullCsvPath))
+                {
+                    LoadDataBlocksToTree(fullCsvPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during TIA Portal detection:\n{ex.Message}",
+                        "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // Wyłączenie animacji i odblokowanie przycisku
+                ToggleLoadingAnimation();
+                button1.Enabled = true;
             }
 
-            // 3. Walidacja: sprawdzenie, czy plik projektu faktycznie istnieje na dysku
-            if (!File.Exists(projectPath))
-            {
-                MessageBox.Show($"Wskazany plik projektu nie istnieje:\n{projectPath}",
-                                "Błąd ścieżki", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            // 4. Wywołanie Twojej przykładowej funkcji z przekazaniem ścieżki <<<<<<<<<<<<<<<<<<<<TUTAJ FUNKCJA MICHAŁA>>>>>>>>>>>>>>>>>>>>
-            //MojaPrzykładowaFunkcja(projectPath); 
         }
         private void btnLoadCsv_Click(object sender, EventArgs e) //TYMCZASOWE
         {
@@ -139,7 +192,6 @@ namespace Test_Opennes_Clanker
         TiaPortal tiaPortal = null;
         Project project = null;
         bool shouldDisposeTia = false;
-        string excelFilePath = @"C:\Users\user\Desktop\Generator.xlsm";
         private async void btnProcessSelected_Click(object sender, EventArgs e)
         {
             // 1. Pobieramy zaznaczone indeksy z drzewka
@@ -147,69 +199,58 @@ namespace Test_Opennes_Clanker
 
             if (mySelectedIndex == null || mySelectedIndex.Length == 0)
             {
-                MessageBox.Show("Nie zaznaczono żadnego elementu w drzewku!",
-                                "Ostrzeżenie", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Select at least one DB block from the tree view!",
+                                "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // 2. Walidacja nazwy pliku CSV
-            if (string.IsNullOrEmpty(NazwaCsvDir))
+            // 2. Okno wyboru ścieżki zapisu (SaveFileDialog)
+            string selectedExcelPath = string.Empty;
+            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
             {
-                NazwaCsvDir = "lista_ster_bloki_DB.csv";
-            }
+                saveFileDialog.Title = "Select directory and filename for Excel export";
+                saveFileDialog.Filter = "Excel Workbook (*.xlsx)|*.xlsx|Excel Macro-Enabled Workbook (*.xlsm)|*.xlsm|All Files (*.*)|*.*";
+                saveFileDialog.FilterIndex = 1;
+                saveFileDialog.RestoreDirectory = true;
 
-            string csvFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
-            if (!File.Exists(csvFullPath))
-            {
-                MessageBox.Show($"Brak pliku CSV pod ścieżką:\n{csvFullPath}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
+                string rawProjectName = Path.GetFileNameWithoutExtension(textBox1.Text.Trim());
+                string safeProjectName = !string.IsNullOrWhiteSpace(rawProjectName) ? rawProjectName : "Export_DB";
+                saveFileDialog.FileName = $"{safeProjectName}_DB_{DateTime.Now:dd.MM.yyyy_HH-mm}.xlsx";
 
-            // 3. Walidacja ścieżki projektu TIA
-            string projectPath = textBox1.Text.Trim();
-            if (!File.Exists(projectPath))
-            {
-                MessageBox.Show("Wskazany plik projektu TIA Portal nie istnieje!", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            // 4. Odczyt linii pliku CSV i przygotowanie listy do eksportu
-            string[] lines = File.ReadAllLines(csvFullPath);
-            List<(string PlcName, string DbPath)> targetsToExport = new List<(string, string)>();
-
-            foreach (int csvRowIndex in mySelectedIndex)
-            {
-                if (csvRowIndex < 0 || csvRowIndex >= lines.Length) continue;
-
-                string line = lines[csvRowIndex];
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                string[] columns = line.Split(';');
-                if (columns.Length > 6)
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    string targetPlcName = columns[3].Trim('"').Trim();
-                    string fullPathRaw = columns[6].Trim('"').Trim();
-
-                    string projName = columns[2].Trim('"').Trim();
-                    string prefix = $"{projName}/{targetPlcName}/";
-
-                    string targetDbPath = fullPathRaw;
-                    if (fullPathRaw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetDbPath = fullPathRaw.Substring(prefix.Length);
-                    }
-
-                    targetsToExport.Add((targetPlcName, targetDbPath));
+                    selectedExcelPath = saveFileDialog.FileName;
+                }
+                else
+                {
+                    return; // Użytkownik anulował wybór
                 }
             }
 
-            if (targetsToExport.Count == 0)
+            // 3. Walidacja ścieżek
+            string csvFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir ?? "lista_ster_bloki_DB.csv");
+            if (!File.Exists(csvFullPath))
             {
-                MessageBox.Show("Nie udało się odczytać ścieżek z zaznaczonych elementów CSV.", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"CSV map file not found at:\n{csvFullPath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            // 5. Start animacji ładowania oraz zablokowanie przycisku
+            string projectPath = textBox1.Text.Trim();
+            if (!File.Exists(projectPath))
+            {
+                MessageBox.Show("Specified TIA Portal project file does not exist!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // 4. Budowanie listy celów za pomocą serwisu
+            var targetsToExport = ExcelExporterService.BuildTargetsFromCsv(csvFullPath, mySelectedIndex);
+            if (targetsToExport.Count == 0)
+            {
+                MessageBox.Show("Failed to parse paths from selected CSV rows.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 5. Wykonanie zadania w tle
             ToggleLoadingAnimation();
             button2.Enabled = false;
 
@@ -217,7 +258,6 @@ namespace Test_Opennes_Clanker
             {
                 await Task.Run(() =>
                 {
-                    // Podłączenie pod istniejącą instancję TIA lub otwarcie nowej w tle
                     var processes = TiaPortal.GetProcesses();
                     if (processes.Count > 0)
                     {
@@ -234,24 +274,22 @@ namespace Test_Opennes_Clanker
 
                     if (project == null)
                     {
-                        throw new Exception("Nie udało się pobrać referencji do projektu TIA Portal.");
+                        throw new Exception("Unable to acquire TIA Portal project reference.");
                     }
 
-                    // Zbiorczy, szybki eksport wybranych bloków DB w pamięci RAM
-
-                    ExcelExporterService.ExportSelectedDbsToExcel(project, excelFilePath, targetsToExport);
+                    // Przekazanie przetworzonych danych do serwisu
+                    ExcelExporterService.ExportSelectedDbsToExcel(project, selectedExcelPath, targetsToExport);
                 });
 
-                MessageBox.Show("Eksport wybranych bloków zakończony sukcesem!", "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Selected DB blocks exported successfully!\n\nFile saved at:\n{selectedExcelPath}",
+                                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"[BŁĄD KRYTYCZNY]: {ex.Message}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Console.WriteLine($"\n[BŁĄD KRYTYCZNY] {ex.Message}");
+                MessageBox.Show($"[CRITICAL ERROR]: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
-                // Asynchroniczne zamykanie sesji TIA w tle (jeśli była otwierana przez aplikację)
                 if (shouldDisposeTia && tiaPortal != null)
                 {
                     await Task.Run(() =>
@@ -263,7 +301,6 @@ namespace Test_Opennes_Clanker
                     });
                 }
 
-                // Zatrzymanie animacji i odblokowanie przycisku UI
                 ToggleLoadingAnimation();
                 button2.Enabled = true;
             }
@@ -310,7 +347,7 @@ namespace Test_Opennes_Clanker
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Błąd podczas budowania drzewa:\n{ex.Message}", "Błąd", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error while building tree structure:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -441,11 +478,7 @@ namespace Test_Opennes_Clanker
         }
 
 
-        //_______________________________FUNKCJE Z PROGRAMU MICHAŁA__________________
-        //--------------------------------------------------------------------------
-       
-
-        #region Assembly Resolver
+        #region Assembly Resolver //CZY TO MA JESZCZE SENS? 0 - REFERENCJI
         private static Assembly MyResolver(object sender, ResolveEventArgs args)
         {
             int index = args.Name.IndexOf(',');
@@ -468,9 +501,139 @@ namespace Test_Opennes_Clanker
         //                                                                                                          ^ --------------- WKLEJONE --------------- ^
 
 
-        private void btnOpenEditor_Click(object sender, EventArgs e)
+        private async void btnImportSelected_Click(object sender, EventArgs e)
         {
+            // 1. Wybór pliku Excel przez użytkownika
+            string excelFilePath = string.Empty;
 
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Title = "Select Excel File to Import";
+                openFileDialog.Filter = "Excel Files (*.xlsx;*.xlsm)|*.xlsx;*.xlsm|All Files (*.*)|*.*";
+                openFileDialog.InitialDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    excelFilePath = openFileDialog.FileName;
+                }
+                else
+                {
+                    return; // Użytkownik anulował
+                }
+            }
+
+            // 2. Pobranie zaznaczonych elementów z drzewka
+            mySelectedIndex = GetSelectedCsvRowIndices();
+
+            if (mySelectedIndex == null || mySelectedIndex.Length == 0)
+            {
+                MessageBox.Show("No items selected in the tree view!", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 3. Walidacja pliku CSV z mapą zagnieżdżeń
+            if (string.IsNullOrEmpty(NazwaCsvDir))
+            {
+                NazwaCsvDir = "lista_ster_bloki_DB.csv";
+            }
+
+            string csvFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
+            if (!File.Exists(csvFullPath))
+            {
+                MessageBox.Show($"CSV file not found at:\n{csvFullPath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // 4. Odczyt linii z CSV i wyciągnięcie celów do importu
+            string[] lines = File.ReadAllLines(csvFullPath);
+            List<(string PlcName, string DbPath)> targetsToImport = new List<(string, string)>();
+
+            foreach (int csvRowIndex in mySelectedIndex)
+            {
+                if (csvRowIndex < 0 || csvRowIndex >= lines.Length) continue;
+
+                string line = lines[csvRowIndex];
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                string[] columns = line.Split(';');
+                if (columns.Length > 6)
+                {
+                    string targetPlcName = columns[3].Trim('"').Trim();
+                    string fullPathRaw = columns[6].Trim('"').Trim();
+
+                    string projName = columns[2].Trim('"').Trim();
+                    string prefix = $"{projName}/{targetPlcName}/";
+
+                    string targetDbPath = fullPathRaw;
+                    if (fullPathRaw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetDbPath = fullPathRaw.Substring(prefix.Length);
+                    }
+
+                    targetsToImport.Add((targetPlcName, targetDbPath));
+                }
+            }
+
+            if (targetsToImport.Count == 0)
+            {
+                MessageBox.Show("Failed to parse paths from selected CSV rows.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 5. Wykonanie importu w tle (Task.Run) z blokadą interfejsu
+            ToggleLoadingAnimation();
+            button2.Enabled = false;
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    var processes = TiaPortal.GetProcesses();
+                    if (processes.Count > 0)
+                    {
+                        tiaPortal = processes[0].Attach();
+                        project = tiaPortal.Projects.FirstOrDefault();
+                        shouldDisposeTia = false;
+                    }
+                    else
+                    {
+                        string projectPath = textBox1.Text.Trim();
+                        tiaPortal = new TiaPortal(TiaPortalMode.WithoutUserInterface);
+                        project = tiaPortal.Projects.Open(new FileInfo(projectPath));
+                        shouldDisposeTia = true;
+                    }
+
+                    if (project == null)
+                    {
+                        throw new Exception("Unable to acquire TIA Portal project reference.");
+                    }
+
+                    // Wywołanie usługi importu z Excela do TIA Portal
+                    ExcelImporterService.ImportSelectedDbsFromExcel(project, excelFilePath, targetsToImport);
+                });
+
+                MessageBox.Show("Selected DB blocks imported successfully from Excel!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"[CRITICAL ERROR]: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (shouldDisposeTia && tiaPortal != null)
+                {
+                    await Task.Run(() =>
+                    {
+                        project?.Close();
+                        tiaPortal.Dispose();
+                        tiaPortal = null;
+                        project = null;
+                    });
+                }
+
+                ToggleLoadingAnimation();
+                button2.Enabled = true;
+            }
         }
 
 
@@ -543,7 +706,12 @@ namespace Test_Opennes_Clanker
             }
         }
 
-        private void pictureBox2_Click(object sender, EventArgs e)
+        private void groupBox2_Enter(object sender, EventArgs e)
+        {
+
+        }
+
+        private void groupBox1_Enter(object sender, EventArgs e)
         {
 
         }

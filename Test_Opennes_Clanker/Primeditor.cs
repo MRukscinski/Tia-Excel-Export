@@ -6,7 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using DataGridViewAutoFilter;
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
     public partial class Primeditor : Form
     {

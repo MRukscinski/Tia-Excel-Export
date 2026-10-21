@@ -9,28 +9,29 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 
-namespace Test_Opennes_Clanker
+namespace Primexcel
 {
     public static class TiaPortalService
     {
-        // Licznik nadający unikalne ID każdemu węzłowi w pliku CSV
+        // Licznik nadający unikalne ID każdemu węzłowi w pliku CSV (Unique ID counter for each node in the CSV file)
         private static long _idCounter = 0;
 
         /// <summary>
-        /// Skanuje strukturę projektu TIA Portal i zapisuje drzewo obiektów do pliku CSV.
+        /// Skanuje strukturę projektu TIA Portal i zapisuje drzewo obiektów do pliku CSV. (Scans the TIA Portal project structure and exports the object tree to a CSV file.)
         /// </summary>
+       
         public static void ExportTiaStructureToCsv(string inputProjectPath, string NazwaCsv)
         {
             if (string.IsNullOrWhiteSpace(inputProjectPath) || !File.Exists(inputProjectPath))
             {
-                Console.WriteLine($"[BŁĄD]: Plik projektu nie istnieje pod ścieżką: {inputProjectPath}");
+                Console.WriteLine($"[ERROR]: Project file does not exist at path: {inputProjectPath}");
                 return;
             }
 
             _idCounter = 0;
             string outputCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsv);
 
-            Console.WriteLine($"[INFO] Rozpoczynanie przetwarzania pliku: {inputProjectPath}");
+            Console.WriteLine($"[INFO] Starting processing file: {inputProjectPath}");
 
             TiaPortal tiaProcess = null;
             Project mainProject = null;
@@ -38,31 +39,31 @@ namespace Test_Opennes_Clanker
 
             try
             {
-                // Podpięcie pod otwartą instancję TIA Portal
+                // Podpięcie pod otwartą instancję TIA Portal (Attach to an active open TIA Portal instance)
                 var runningProcesses = TiaPortal.GetProcesses();
                 if (runningProcesses.Count > 0)
                 {
-                    Console.WriteLine("[INFO] Wykryto otwartą instancję TIA Portal. Podłączanie...");
+                    Console.WriteLine("[INFO] Active TIA Portal instance detected. Connecting...");
                     tiaProcess = runningProcesses[0].Attach();
                     mainProject = tiaProcess.Projects.FirstOrDefault();
                 }
 
-                // Otwieranie w tle, jeśli TIA Portal nie był uruchomiony
+                // Otwieranie w tle, jeśli TIA Portal nie był uruchomiony (Open in background if TIA Portal was not running)
                 if (mainProject == null)
                 {
-                    Console.WriteLine("[INFO] Otwieranie nowej instancji TIA Portal w tle...");
+                    Console.WriteLine("[INFO] Opening new TIA Portal background instance...");
                     if (tiaProcess == null)
                     {
                         tiaProcess = new TiaPortal(TiaPortalMode.WithoutUserInterface);
                     }
 
                     FileInfo projectFile = new FileInfo(inputProjectPath);
-                    Console.WriteLine("[INFO] Otwieranie pliku projektu...");
+                    Console.WriteLine("[INFO] Opening project file...");
                     mainProject = tiaProcess.Projects.Open(projectFile);
                     createdNewInstance = true;
                 }
 
-                Console.WriteLine("[INFO] Skanowanie struktury projektu i zapis do CSV...");
+                Console.WriteLine("[INFO] Scanning project structure and exporting to CSV...");
 
                 using (StreamWriter writer = new StreamWriter(outputCsvPath, false, Encoding.UTF8, 65536))
                 {
@@ -71,19 +72,19 @@ namespace Test_Opennes_Clanker
                     writer.Flush();
                 }
 
-                Console.WriteLine("\n[SUKCES] Zakończono pobieranie danych!");
-                Console.WriteLine($"[SUKCES] Plik CSV został zapisany: {outputCsvPath}");
+                Console.WriteLine("\n[SUCCESS] Data retrieval completed successfully!");
+                Console.WriteLine($"[SUCCESS] CSV file saved at: {outputCsvPath}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"\n[BŁĄD]: Wystąpił wyjątek podczas przetwarzania: {ex.Message}");
+                Console.WriteLine($"\n[ERROR]: An exception occurred during processing: {ex.Message}");
                 Console.WriteLine(ex.StackTrace);
             }
             finally
             {
                 if (createdNewInstance)
                 {
-                    Console.WriteLine("[INFO] Zamykanie projektu i instancji TIA...");
+                    Console.WriteLine("[INFO] Closing project and TIA instance...");
                     mainProject?.Close();
                     tiaProcess?.Dispose();
                 }
@@ -91,7 +92,7 @@ namespace Test_Opennes_Clanker
         }
 
         /// <summary>
-        /// Pobiera lub dołącza do instancji TIA Portal.
+        /// Pobiera lub dołącza do instancji TIA Portal. (Retrieves or attaches to a TIA Portal instance.)
         /// </summary>
         public static TiaPortal GetOrAttachTiaPortal(string projectPath, out Project project, out bool createdNewInstance)
         {
@@ -112,7 +113,7 @@ namespace Test_Opennes_Clanker
             }
         }
 
-        #region Metody Pomocnicze Skanowania TIA
+        #region Metody Pomocnicze Skanowania TIA / TIA Scanning Helper Methods
 
         private static void ScanDevicesInProject(Project project, StreamWriter writer)
         {

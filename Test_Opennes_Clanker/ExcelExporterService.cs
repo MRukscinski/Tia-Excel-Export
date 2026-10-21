@@ -68,7 +68,15 @@ namespace Primexcel
         {
             if (targets == null || targets.Count == 0) return;
 
-            // 1. Kopia zapasowa, jeśli plik już istniał na dysku
+            // Ścieżka do wbudowanego szablonu z makrami
+            string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Template.xlsm");
+
+            if (!File.Exists(templatePath))
+            {
+                throw new FileNotFoundException($"Excel template file not found at: {templatePath}");
+            }
+
+            // Kopia zapasowa przed nadpisaniem
             if (File.Exists(excelFilePath))
             {
                 try
@@ -88,15 +96,13 @@ namespace Primexcel
                 }
             }
 
-            // 2. Wczytanie lub utworzenie nowego skoroszytu
-            XLWorkbook workbook = File.Exists(excelFilePath) ? new XLWorkbook(excelFilePath) : new XLWorkbook();
-
-            using (workbook)
+            // Ładowanie pliku z szablonu z zachowaniem makr
+            using (XLWorkbook workbook = new XLWorkbook(templatePath))
             {
-                // Czyszczenie z zachowaniem Legendy
                 var tempResetSheet = workbook.Worksheets.Add("Temp_Reset_Sheet");
                 EnsureLegendSheetExists(workbook);
 
+                // Usuwanie starych arkuszy DB (zostawiając Temp_Reset_Sheet oraz "Legend")
                 var existingSheets = workbook.Worksheets
                     .Where(ws => ws.Name != "Temp_Reset_Sheet" &&
                                  !string.Equals(ws.Name, "Legend", StringComparison.OrdinalIgnoreCase))
@@ -107,7 +113,7 @@ namespace Primexcel
                     sheet.Delete();
                 }
 
-                // Buforowanie sterowników w pamięci RAM
+                // Mapowanie PLC
                 var plcMap = new Dictionary<string, PlcSoftware>(StringComparer.OrdinalIgnoreCase);
                 foreach (Device device in project.Devices)
                 {
@@ -143,6 +149,7 @@ namespace Primexcel
                     }
                 }
 
+                // Usuwanie bufora i zapis pod docelową ścieżką z rozszerzeniem .xlsm
                 if (processedAny && workbook.Worksheets.Count > 1)
                 {
                     tempResetSheet.Delete();
@@ -153,7 +160,7 @@ namespace Primexcel
                     }
 
                     workbook.SaveAs(excelFilePath);
-                    Console.WriteLine($"\nSUCCESS: Saved Excel file at: {excelFilePath}");
+                    Console.WriteLine($"\nSUCCESS: Saved Excel file with macros at: {excelFilePath}");
                 }
                 else
                 {

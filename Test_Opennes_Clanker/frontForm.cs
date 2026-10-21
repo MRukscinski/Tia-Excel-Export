@@ -194,7 +194,6 @@ namespace Primexcel
         bool shouldDisposeTia = false;
         private async void btnProcessSelected_Click(object sender, EventArgs e)
         {
-            // 1. Pobieramy zaznaczone indeksy z drzewka
             mySelectedIndex = GetSelectedCsvRowIndices();
 
             if (mySelectedIndex == null || mySelectedIndex.Length == 0)
@@ -204,18 +203,25 @@ namespace Primexcel
                 return;
             }
 
-            // 2. Okno wyboru ścieżki zapisu (SaveFileDialog)
+            // 1. Zabezpieczenie przed wartością null dla pliku CSV
+            if (string.IsNullOrEmpty(NazwaCsvDir))
+            {
+                NazwaCsvDir = "lista_ster_bloki_DB.csv";
+            }
+
+            // 2. Konfiguracja SaveFileDialog z domyślnym rozszerzeniem .xlsm
             string selectedExcelPath = string.Empty;
             using (SaveFileDialog saveFileDialog = new SaveFileDialog())
             {
                 saveFileDialog.Title = "Select directory and filename for Excel export";
-                saveFileDialog.Filter = "Excel Workbook (*.xlsx)|*.xlsx|Excel Macro-Enabled Workbook (*.xlsm)|*.xlsm|All Files (*.*)|*.*";
+                saveFileDialog.Filter = "Excel Macro-Enabled Workbook (*.xlsm)|*.xlsm|Excel Workbook (*.xlsx)|*.xlsx|All Files (*.*)|*.*";
                 saveFileDialog.FilterIndex = 1;
+                saveFileDialog.DefaultExt = "xlsm";
                 saveFileDialog.RestoreDirectory = true;
 
                 string rawProjectName = Path.GetFileNameWithoutExtension(textBox1.Text.Trim());
                 string safeProjectName = !string.IsNullOrWhiteSpace(rawProjectName) ? rawProjectName : "Export_DB";
-                saveFileDialog.FileName = $"{safeProjectName}_DB_{DateTime.Now:dd.MM.yyyy_HH-mm}.xlsx";
+                saveFileDialog.FileName = $"{safeProjectName}_DB_{DateTime.Now:dd.MM.yyyy_HH-mm}.xlsm";
 
                 if (saveFileDialog.ShowDialog() == DialogResult.OK)
                 {
@@ -227,8 +233,8 @@ namespace Primexcel
                 }
             }
 
-            // 3. Walidacja ścieżek
-            string csvFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir ?? "lista_ster_bloki_DB.csv");
+            // 3. Sprawdzenie istniejących plików
+            string csvFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
             if (!File.Exists(csvFullPath))
             {
                 MessageBox.Show($"CSV map file not found at:\n{csvFullPath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -242,7 +248,7 @@ namespace Primexcel
                 return;
             }
 
-            // 4. Budowanie listy celów za pomocą serwisu
+            // 4. Pobranie targetów z serwisu
             var targetsToExport = ExcelExporterService.BuildTargetsFromCsv(csvFullPath, mySelectedIndex);
             if (targetsToExport.Count == 0)
             {
@@ -277,7 +283,7 @@ namespace Primexcel
                         throw new Exception("Unable to acquire TIA Portal project reference.");
                     }
 
-                    // Przekazanie przetworzonych danych do serwisu
+                    // Eksport do pliku Excel z wykorzystaniem szablonu
                     ExcelExporterService.ExportSelectedDbsToExcel(project, selectedExcelPath, targetsToExport);
                 });
 

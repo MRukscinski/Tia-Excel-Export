@@ -18,9 +18,13 @@ namespace Primexcel
     {
         private const int MaxLevelColumns = 8; // Liczba kolumn na poziomy zagnieżdżenia (A-H)
 
-        public static void ImportSelectedDbsFromExcel(Project project, string excelFilePath, List<(string PlcName, string DbPath)> targets)
+        /// <summary>
+        /// Główna metoda importująca dane z pliku Excel do TIA Portal.
+        /// Obsługuje zarówno obiekty Siemens.Engineering.Project jak i Siemens.Engineering.Multiuser.MultiuserProject.
+        /// </summary>
+        public static void ImportSelectedDbsFromExcel(dynamic projectObj, string excelFilePath, List<(string PlcName, string DbPath)> targets)
         {
-            if (targets == null || targets.Count == 0) return;
+            if (targets == null || targets.Count == 0 || projectObj == null) return;
 
             if (!File.Exists(excelFilePath))
             {
@@ -30,10 +34,12 @@ namespace Primexcel
 
             using (XLWorkbook workbook = new XLWorkbook(excelFilePath))
             {
+                // Dynamiczne pobranie kolekcji Devices z obiektu projektu
+                DeviceComposition devices = projectObj.Devices;
+
                 // Buforowanie sterowników PLC z TIA Portal w pamięci RAM
-                // (Buffering PLC controllers from TIA Portal in RAM)
                 var plcMap = new Dictionary<string, PlcSoftware>(StringComparer.OrdinalIgnoreCase);
-                foreach (Device device in project.Devices)
+                foreach (Device device in devices)
                 {
                     foreach (PlcSoftware plc in GetPlcSoftwareFromDevice(device))
                     {
@@ -55,7 +61,6 @@ namespace Primexcel
                     }
 
                     // Szukanie bloku DB w TIA Portal po podanej ścieżce
-                    // (Searching for DB block in TIA Portal by specified path)
                     var blockResult = FindBlockAndParentGroup(plcSoftware, target.DbPath);
                     if (blockResult.Block == null)
                     {
@@ -85,10 +90,18 @@ namespace Primexcel
                 if (anyUpdated)
                 {
                     Console.WriteLine("\nSaving changes to TIA Portal project...");
-                    project.Save();
-                    Console.WriteLine("==========================================");
-                    Console.WriteLine("SUCCESS: Data imported and project saved successfully!");
-                    Console.WriteLine("==========================================");
+                    try
+                    {
+                        // Wywołanie Save() na obiekcie dynamicznym (działa dla obu typów projektów)
+                        projectObj.Save();
+                        Console.WriteLine("==========================================");
+                        Console.WriteLine("SUCCESS: Data imported and project saved successfully!");
+                        Console.WriteLine("==========================================");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[WARNING] Changes were applied, but project save operation failed: {ex.Message}");
+                    }
                 }
                 else
                 {
@@ -105,10 +118,10 @@ namespace Primexcel
             string tempXmlPath = Path.Combine(Path.GetTempPath(), $"{plcName}_{dbName}_Import.xml");
             try
             {
-                // 1. Eksport obecnie istniejącego bloku DB do tymczasowego XML (1. Export current DB block to temporary XML)
+                // 1. Eksport obecnie istniejącego bloku DB do tymczasowego XML
                 dbBlock.Export(new FileInfo(tempXmlPath), ExportOptions.WithDefaults);
 
-                // 2. Modyfikacja pliku XML na podstawie danych z Excela (2. Modify XML file based on Excel data)
+                // 2. Modyfikacja pliku XML na podstawie danych z Excela
                 bool modified = ModifyXmlWithExcelData(tempXmlPath, excelData);
                 if (!modified)
                 {
@@ -116,11 +129,11 @@ namespace Primexcel
                     return false;
                 }
 
-                // 3. Ponowny import zmodyfikowanego XML (z opcją Override/Nadpisania) (3. Re-import modified XML with Override option)
+                // 3. Ponowny import zmodyfikowanego XML (z opcją Override/Nadpisania)
                 parentGroup.Blocks.Import(new FileInfo(tempXmlPath), ImportOptions.Override);
                 Console.WriteLine($" -> [SUCCESS] Updated block '{dbName}' imported.");
 
-                // 4. Kompilacja oprogramowania PLC (4. PLC software compilation)
+                // 4. Kompilacja oprogramowania PLC
                 Console.WriteLine($" -> Compiling controller {plcName}...");
                 ICompilable compilable = plcSoftware.GetService<ICompilable>();
                 if (compilable != null)

@@ -6,6 +6,7 @@ using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.Multiuser;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -105,54 +106,67 @@ namespace Primexcel
         }
         private async void button1_Click(object sender, EventArgs e)
         {
-            // 1. Zabezpieczenie interfejsu (start animacji ładowania)
-            
             button1.Enabled = false;
 
             try
             {
-                TiaPortal runningTiaProcess = null;
-                Project activeProject = null;
+                string detectedProjectPath = string.Empty;
+                string projectName = string.Empty;
 
-                // 2. Praca w tle (Task.Run), aby nie zamrozić interfejsu WinForms
                 await Task.Run(() =>
                 {
-                    // Pobieramy listę wszystkich uruchomionych procesów TIA Portal na komputerze
                     var runningProcesses = TiaPortal.GetProcesses();
 
                     if (runningProcesses.Count == 0)
                     {
-                        throw new Exception("No active TIA Portal instance found!");
+                        throw new Exception("Nie znaleziono uruchomionej instancji TIA Portal!");
                     }
 
-                    // Podłączamy się pod pierwszy wykryty proces TIA Portal
-                    runningTiaProcess = runningProcesses[0].Attach();
-                    activeProject = runningTiaProcess.Projects.FirstOrDefault();
+                    TiaPortal runningTiaProcess = runningProcesses[0].Attach();
 
-                    if (activeProject == null)
+                    // 1. Sprawdzamy standardowy projekt Single-User
+                    Project singleUserProject = runningTiaProcess.Projects.FirstOrDefault();
+
+                    if (singleUserProject != null)
                     {
-                        throw new Exception("No open project found in the detected TIA Portal instance.");
+                        detectedProjectPath = singleUserProject.Path.FullName;
+                        projectName = singleUserProject.Name;
+                    }
+                    // 2. Jeśli brak Single-User, sprawdzamy otwartą sesję Multiuser
+                    else if (runningTiaProcess.LocalSessions.Count > 0)
+                    {
+                        var localSession = runningTiaProcess.LocalSessions.FirstOrDefault();
+                        if (localSession != null && localSession.Project != null)
+                        {
+                            // Właściwe wyciągnięcie obiektu MultiuserProject
+                            var multiuserProject = localSession.Project;
+
+                            detectedProjectPath = multiuserProject.Path.FullName;
+                            projectName = multiuserProject.Name;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(detectedProjectPath))
+                    {
+                        throw new Exception("Brak otwartego projektu lub sesji lokalnej w wykrytej instancji TIA Portal.");
                     }
                 });
 
-                // 3. Automatycznie wpisujemy pełną ścieżkę projektu do textBox1 (w wątku UI)
-                string detectedProjectPath = activeProject.Path.FullName;
+                // Wpisywanie danych do kontrolerów UI
                 textBox1.Text = detectedProjectPath;
 
-                MessageBox.Show($"Successfully connected to active TIA Portal project:\n{activeProject.Name}\n\nPath: {detectedProjectPath}",
-                 "TIA Openness Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Pomyślnie połączono z projektem TIA Portal:\n{projectName}\n\nŚcieżka: {detectedProjectPath}",
+                                "TIA Openness Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
                 NazwaCsvDir = "lista_ster_bloki_DB.csv";
                 ToggleLoadingAnimation();
 
-                // 4. (Opcjonalnie) Możesz od razu wygenerować strukturę CSV z podłączonego projektu
-                //this.NazwaCsvDir = "lista_ster_bloki_DB.csv";
-
+                // 4. Skanowanie i generowanie pliku CSV
                 await Task.Run(() =>
                 {
                     TiaPortalService.ExportTiaStructureToCsv(detectedProjectPath, NazwaCsvDir);
                 });
 
-                // Automatyczne załadowanie wygenerowanego CSV do drzewka
                 string fullCsvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, NazwaCsvDir);
                 if (File.Exists(fullCsvPath))
                 {
@@ -161,16 +175,14 @@ namespace Primexcel
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during TIA Portal detection:\n{ex.Message}",
-                        "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Błąd podczas detekcji TIA Portal:\n{ex.Message}",
+                                "Openness Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
-                // Wyłączenie animacji i odblokowanie przycisku
                 ToggleLoadingAnimation();
                 button1.Enabled = true;
             }
-
         }
         private void btnLoadCsv_Click(object sender, EventArgs e) //TYMCZASOWE
         {
@@ -242,7 +254,7 @@ namespace Primexcel
             }
 
             string projectPath = textBox1.Text.Trim();
-            if (!File.Exists(projectPath))
+            if (!File.Exists(projectPath) && !Directory.Exists(projectPath))
             {
                 MessageBox.Show("Specified TIA Portal project file does not exist!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
@@ -265,26 +277,41 @@ namespace Primexcel
                 await Task.Run(() =>
                 {
                     var processes = TiaPortal.GetProcesses();
+                    object targetProject = null;
+
                     if (processes.Count > 0)
                     {
                         tiaPortal = processes[0].Attach();
-                        project = tiaPortal.Projects.FirstOrDefault();
+
+                        // 1. Sprawdzamy projekt Single-User
+                        targetProject = tiaPortal.Projects.FirstOrDefault();
+
+                        // 2. Jeśli brak Single-User, pobieramy projekt z sesji Multiuser
+                        if (targetProject == null && tiaPortal.LocalSessions.Count > 0)
+                        {
+                            var localSession = tiaPortal.LocalSessions.FirstOrDefault();
+                            if (localSession != null)
+                            {
+                                targetProject = localSession.Project; // Zwraca MultiuserProject
+                            }
+                        }
+
                         shouldDisposeTia = false;
                     }
                     else
                     {
                         tiaPortal = new TiaPortal(TiaPortalMode.WithoutUserInterface);
-                        project = tiaPortal.Projects.Open(new FileInfo(projectPath));
+                        targetProject = tiaPortal.Projects.Open(new FileInfo(projectPath));
                         shouldDisposeTia = true;
                     }
 
-                    if (project == null)
+                    if (targetProject == null)
                     {
-                        throw new Exception("Unable to acquire TIA Portal project reference.");
+                        throw new Exception("Unable to acquire TIA Portal project reference (neither Single-User project nor Multiuser LocalSession was found).");
                     }
 
-                    // Eksport do pliku Excel z wykorzystaniem szablonu
-                    ExcelExporterService.ExportSelectedDbsToExcel(project, selectedExcelPath, targetsToExport);
+                    // Eksport do pliku Excel z przekazaniem obiektu jako dynamic / object
+                    ExcelExporterService.ExportSelectedDbsToExcel(targetProject, selectedExcelPath, targetsToExport);
                 });
 
                 MessageBox.Show($"Selected DB blocks exported successfully!\n\nFile saved at:\n{selectedExcelPath}",
@@ -595,27 +622,42 @@ namespace Primexcel
                 await Task.Run(() =>
                 {
                     var processes = TiaPortal.GetProcesses();
+                    object targetProject = null;
+
                     if (processes.Count > 0)
                     {
                         tiaPortal = processes[0].Attach();
-                        project = tiaPortal.Projects.FirstOrDefault();
+
+                        // 1. Sprawdzamy projekt Single-User
+                        targetProject = tiaPortal.Projects.FirstOrDefault();
+
+                        // 2. Jeśli brak Single-User, pobieramy projekt z sesji Multiuser
+                        if (targetProject == null && tiaPortal.LocalSessions.Count > 0)
+                        {
+                            var localSession = tiaPortal.LocalSessions.FirstOrDefault();
+                            if (localSession != null)
+                            {
+                                targetProject = localSession.Project;
+                            }
+                        }
+
                         shouldDisposeTia = false;
                     }
                     else
                     {
                         string projectPath = textBox1.Text.Trim();
                         tiaPortal = new TiaPortal(TiaPortalMode.WithoutUserInterface);
-                        project = tiaPortal.Projects.Open(new FileInfo(projectPath));
+                        targetProject = tiaPortal.Projects.Open(new FileInfo(projectPath));
                         shouldDisposeTia = true;
                     }
 
-                    if (project == null)
+                    if (targetProject == null)
                     {
-                        throw new Exception("Unable to acquire TIA Portal project reference.");
+                        throw new Exception("Unable to acquire TIA Portal project reference (neither Single-User project nor Multiuser LocalSession was found).");
                     }
 
-                    // Wywołanie usługi importu z Excela do TIA Portal
-                    ExcelImporterService.ImportSelectedDbsFromExcel(project, excelFilePath, targetsToImport);
+                    // Wywołanie usługi importu z Excela do TIA Portal z obiektem typu dynamic
+                    ExcelImporterService.ImportSelectedDbsFromExcel(targetProject, excelFilePath, targetsToImport);
                 });
 
                 MessageBox.Show("Selected DB blocks imported successfully from Excel!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);

@@ -63,10 +63,11 @@ namespace Primexcel
 
         /// <summary>
         /// Główna metoda eksportująca wybrane bloki DB do pliku Excel.
+        /// Obsługuje zarówno obiekty Siemens.Engineering.Project jak i Siemens.Engineering.Multiuser.MultiuserProject.
         /// </summary>
-        public static void ExportSelectedDbsToExcel(Project project, string excelFilePath, List<(string PlcName, string DbPath)> targets)
+        public static void ExportSelectedDbsToExcel(dynamic projectObj, string excelFilePath, List<(string PlcName, string DbPath)> targets)
         {
-            if (targets == null || targets.Count == 0) return;
+            if (targets == null || targets.Count == 0 || projectObj == null) return;
 
             // Ścieżka do wbudowanego szablonu z makrami
             string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Template.xlsm");
@@ -113,9 +114,11 @@ namespace Primexcel
                     sheet.Delete();
                 }
 
-                // Mapowanie PLC
+                // Mapowanie PLC z wykorzystaniem dynamicznego pobierania kolekcji Devices
                 var plcMap = new Dictionary<string, PlcSoftware>(StringComparer.OrdinalIgnoreCase);
-                foreach (Device device in project.Devices)
+                DeviceComposition devices = projectObj.Devices;
+
+                foreach (Device device in devices)
                 {
                     foreach (PlcSoftware plc in GetPlcSoftwareFromDevice(device))
                     {
@@ -444,6 +447,7 @@ namespace Primexcel
         }
 
         #endregion
+
         #region Metody Pomocnicze - Legenda
 
         /// <summary>
@@ -495,7 +499,6 @@ namespace Primexcel
         #endregion
     }
 
-
     public class DbParameterRow
     {
         public List<string> Path { get; set; } = new List<string>();
@@ -503,5 +506,4 @@ namespace Primexcel
         public string StartValue { get; set; }
         public string Comment { get; set; }
     }
-
 }
